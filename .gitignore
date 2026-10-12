@@ -1,0 +1,14 @@
+# Private Testfotos (echte Einkaufszettel) – nicht veröffentlichen
+testbilder/
+
+# Interne Einstellungen von Claude Code
+.claude/
+
+# Planungsunterlagen nur lokal
+Projektplan.md
+Einkaufszettel app.md
+
+# Sonstiges
+node_modules/
+.DS_Store
+Thumbs.db
