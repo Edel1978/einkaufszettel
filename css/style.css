@@ -430,6 +430,9 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   color: var(--text);
 }
 .hinweis-link { display: grid; gap: 2px; text-decoration: none; }
+.warn-box { background: #fff3e0; color: #5d4037; }
+@media (prefers-color-scheme: dark) { .warn-box { background: #3e2f1c; color: #ffe0b2; } }
+.dienst-zeile { margin: -6px 0 12px; }
 .hinweis-link span { color: var(--primaer); font-weight: 600; }
 
 .fehler-box {
@@ -611,9 +614,13 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .option small { color: var(--text-leise); font-size: 0.85rem; }
 .passwort-feld { display: flex; gap: 8px; }
 .passwort-feld .btn { flex-shrink: 0; padding: 0 12px; }
-.test-ergebnis { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--hintergrund); }
-.test-ergebnis.ok { background: var(--primaer-hell); }
-.test-ergebnis.fehler { color: var(--gefahr); border: 1px solid var(--gefahr); background: none; }
+.test-ergebnis { display: grid; gap: 6px; margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--hintergrund); }
+.test-ergebnis p { margin: 0; }
+.test-ergebnis .ok { color: var(--primaer); }
+.test-ergebnis .fehler { color: var(--gefahr); }
+.einstellungen .nur-direkt { gap: 0; }
+.dienst-block { display: grid; gap: 10px; padding: 14px 0; }
+.dienst-block + .dienst-block { border-top: 1px solid var(--linie); }
 
 /* ---------- Meldung ---------- */
 .meldung {

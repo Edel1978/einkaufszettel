@@ -213,10 +213,20 @@ async function erkenneJetzt() {
   const v = vorgang;
   v.status = 'laedt';
   v.abbruch = new AbortController();
+  v.wechselText = '';
   zeigeFoto();
 
   try {
-    const kontext = { bekannteArtikel: bekannteArtikel(app.listen()) };
+    const kontext = {
+      bekannteArtikel: bekannteArtikel(app.listen()),
+      // Klappt der erste Dienst nicht, zeigen, dass jetzt der zweite versucht wird.
+      beiWechsel: (erster, zweiter) => {
+        if (vorgang !== v) return;
+        v.wechselText = `${erster} hat nicht geklappt – versuche es mit ${zweiter} …`;
+        const el = app.inhalt.querySelector('[data-lade-hinweis]');
+        if (el) el.textContent = v.wechselText;
+      },
+    };
     const ergebnis = v.art === 'sprache'
       ? await erkenneText(v.text, v.abbruch.signal, kontext)
       : await erkenne(v.bild, v.abbruch.signal, kontext);
@@ -226,6 +236,8 @@ async function erkenneJetzt() {
     Object.assign(v, {
       status: 'pruefen',
       hinweis: ergebnis.hinweis,
+      dienst: ergebnis.dienst,
+      ausweichGrund: ergebnis.ausweichGrund,
       ziel,
       neuerName: eindeutigerName(datumsName(), listen),
       eintraege: ergebnis.eintraege.map((e) => ({
@@ -297,7 +309,7 @@ export function zeigeFoto() {
         ${bildHtml}${textHtml}
         <div class="lade-kreis" aria-hidden="true"></div>
         <p class="leer-titel">${titel}</p>
-        <p class="leise-text">${sprache ? 'Das dauert meist nur ein paar Sekunden.' : 'Das dauert meist 10 bis 20 Sekunden.'}</p>
+        <p class="leise-text" data-lade-hinweis>${esc(v.wechselText) || (sprache ? 'Das dauert meist nur ein paar Sekunden.' : 'Das dauert meist 10 bis 20 Sekunden.')}</p>
         <button class="btn" type="button" data-aktion="abbrechen">Abbrechen</button>
       </div>`;
   } else if (v.status === 'fehler') {
@@ -347,6 +359,9 @@ function pruefHtml(v) {
     </div>`;
   return `
     ${kopf}
+    ${v.ausweichGrund
+      ? `<p class="info-box warn-box">Erstellt mit <strong>${esc(v.dienst)}</strong>, weil ${esc(v.ausweichGrund)}</p>`
+      : v.dienst ? `<p class="leise-text dienst-zeile">Erstellt mit ${esc(v.dienst)}</p>` : ''}
     ${v.hinweis ? `<p class="info-box">${esc(v.hinweis)}</p>` : ''}
 
     <ul class="pruef-liste">

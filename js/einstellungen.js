@@ -62,7 +62,8 @@ export const SPRACHEINGABEN = [
 
 const STANDARD = {
   betriebsart: 'direkt',
-  anbieter: 'google',
+  anbieter: 'google', // erster Dienst
+  ausweichAnbieter: '', // zweiter Dienst, falls der erste nicht klappt ('' = keiner)
   schluessel: {}, // { anbieterId: 'Schlüssel' }
   modelle: {}, // { anbieterId: 'Modell-ID' }
   serverUrl: '',
@@ -90,34 +91,67 @@ function liesGespeichert() {
   }
 }
 
-export function ladeEinstellungen() {
-  const daten = liesGespeichert();
-  const anbieter = anbieterInfo(daten.anbieter);
-  const modell = anbieter.modelle.some((m) => m.id === daten.modelle[anbieter.id])
+/** Gültiges Modell eines Anbieters (gespeicherte Wahl oder das erste in der Liste). */
+export function modellFuer(daten, anbieterId) {
+  const anbieter = anbieterInfo(anbieterId);
+  return anbieter.modelle.some((m) => m.id === daten.modelle?.[anbieter.id])
     ? daten.modelle[anbieter.id]
     : anbieter.modelle[0].id;
-  return {
-    ...daten,
-    anbieter: anbieter.id,
-    apiSchluessel: daten.schluessel[anbieter.id] ?? '',
-    modell,
-    groqSchluessel: daten.schluessel.groq ?? '', // auch für Whisper, wenn ein anderer Anbieter gewählt ist
-  };
+}
+
+/** Einstellungen so, als wäre der angegebene Anbieter gewählt (mit dessen Schlüssel und Modell). */
+function fuerAnbieter(daten, anbieterId) {
+  const id = anbieterInfo(anbieterId).id;
+  return { ...daten, anbieter: id, apiSchluessel: daten.schluessel[id] ?? '', modell: modellFuer(daten, id) };
 }
 
 /**
- * Speichert Änderungen. "apiSchluessel" und "modell" gelten für den (ggf. neu gewählten) Anbieter.
- * Wechselt der Anbieter, bleiben Schlüssel und Modell des alten Anbieters erhalten.
+ * Aktuelle Einstellungen. "apiSchluessel" und "modell" gehören zum ersten Dienst ("anbieter").
+ */
+export function ladeEinstellungen() {
+  const daten = liesGespeichert();
+  const erster = anbieterInfo(daten.anbieter).id;
+  const ausweich = ANBIETER.some((a) => a.id === daten.ausweichAnbieter) && daten.ausweichAnbieter !== erster
+    ? daten.ausweichAnbieter
+    : '';
+  return {
+    ...fuerAnbieter(daten, erster),
+    ausweichAnbieter: ausweich,
+    groqSchluessel: daten.schluessel.groq ?? '', // auch für Whisper, wenn Groq nicht gewählt ist
+  };
+}
+
+/** Einstellungen für einen bestimmten Anbieter (z. B. für den Verbindungstest). */
+export function einstellungenFuer(anbieterId) {
+  return fuerAnbieter(ladeEinstellungen(), anbieterId);
+}
+
+/**
+ * Einstellungen für den zweiten Dienst – oder null, wenn keiner gewählt ist,
+ * er keinen Schlüssel hat oder nicht im Direkt-Betrieb gearbeitet wird.
+ */
+export function ausweichEinstellungen(einstellungen = ladeEinstellungen()) {
+  const id = einstellungen.ausweichAnbieter;
+  if (einstellungen.betriebsart !== 'direkt' || !id) return null;
+  const zweiter = fuerAnbieter(einstellungen, id);
+  return zweiter.apiSchluessel ? zweiter : null;
+}
+
+/**
+ * Speichert Änderungen.
+ * - "schluessel" / "modelle": Teil-Objekte je Anbieter, werden ergänzt ({ groq: 'gsk_…' }).
+ * - "apiSchluessel" / "modell": kurz für den ersten Dienst.
+ * - "groqSchluessel": kurz für den Groq-Schlüssel (z. B. für Whisper).
  */
 export function speichereEinstellungen(aenderungen) {
   const daten = liesGespeichert();
-  const { apiSchluessel, modell, groqSchluessel, ...rest } = aenderungen;
-  const anbieterWechsel = rest.anbieter && rest.anbieter !== daten.anbieter;
+  const { apiSchluessel, modell, groqSchluessel, schluessel, modelle, ...rest } = aenderungen;
   Object.assign(daten, rest);
+  for (const [id, wert] of Object.entries(schluessel ?? {})) daten.schluessel[id] = String(wert).trim();
+  Object.assign(daten.modelle, modelle);
   if (groqSchluessel !== undefined) daten.schluessel.groq = groqSchluessel.trim();
-  if (!anbieterWechsel) {
-    if (apiSchluessel !== undefined) daten.schluessel[daten.anbieter] = apiSchluessel.trim();
-    if (modell !== undefined) daten.modelle[daten.anbieter] = modell;
-  }
+  if (apiSchluessel !== undefined) daten.schluessel[daten.anbieter] = apiSchluessel.trim();
+  if (modell !== undefined) daten.modelle[daten.anbieter] = modell;
+  if (daten.ausweichAnbieter === daten.anbieter) daten.ausweichAnbieter = '';
   localStorage.setItem(SCHLUESSEL, JSON.stringify(daten));
 }

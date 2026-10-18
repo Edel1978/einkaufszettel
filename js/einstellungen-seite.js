@@ -1,11 +1,12 @@
-// Seite "#/einstellungen": Erkennungsdienst, API-Schlüssel, Modell, Server.
-// Änderungen werden sofort gespeichert.
+// Seite "#/einstellungen": Erkennungsdienste (erster und zweiter), Schlüssel, Modelle, Server,
+// Spracheingabe und App-Optionen. Änderungen werden sofort gespeichert.
 
 import {
   BETRIEBSARTEN, ANBIETER, SPRACHEINGABEN, anbieterInfo, ladeEinstellungen, speichereEinstellungen,
+  einstellungenFuer,
 } from './einstellungen.js';
 import { browserErkennungVerfuegbar, aufnahmeVerfuegbar } from './sprache.js';
-import { testeVerbindung } from './recognizers/index.js';
+import { testeVerbindung, dienstName } from './recognizers/index.js';
 import { kannInstallieren, istInstalliert, installiere } from './installieren.js';
 import { esc } from './util.js';
 
@@ -16,15 +17,48 @@ function installHtml() {
     „Zum Startbildschirm hinzufügen“ bzw. „App installieren“ wählen.</p>`;
 }
 
-/** Eigenes Feld für den Groq-Schlüssel, wenn Whisper genutzt wird, Groq aber nicht der Foto-Anbieter ist. */
+/** Eigenes Feld für den Groq-Schlüssel, wenn Whisper genutzt wird, Groq aber keiner der beiden Dienste ist. */
 function groqFeldNoetig(e) {
-  return e.spracheingabe === 'groq' && !(e.betriebsart === 'direkt' && e.anbieter === 'groq');
+  const groqGewaehlt = e.betriebsart === 'direkt' && (e.anbieter === 'groq' || e.ausweichAnbieter === 'groq');
+  return e.spracheingabe === 'groq' && !groqGewaehlt;
+}
+
+/** Auswahl, Schlüssel und Modell für den ersten bzw. zweiten Dienst. */
+function dienstHtml(e, rolle) {
+  const erster = rolle === 'erster';
+  const id = erster ? e.anbieter : e.ausweichAnbieter;
+  const auswahl = erster ? ANBIETER : ANBIETER.filter((a) => a.id !== e.anbieter);
+  const a = id ? anbieterInfo(id) : null;
+  const modell = a ? einstellungenFuer(id).modell : '';
+
+  return `
+    <div class="dienst-block">
+      <label class="feld"><span>${erster ? 'Erster Dienst' : 'Zweiter Dienst – springt ein, wenn der erste nicht klappt'}</span>
+        <select name="${erster ? 'anbieter' : 'ausweichAnbieter'}">
+          ${erster ? '' : `<option value=""${id ? '' : ' selected'}>Keiner</option>`}
+          ${auswahl.map((x) => `<option value="${x.id}"${x.id === id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}
+        </select></label>
+      ${a ? `
+        <p class="leise-text">${esc(a.info)}</p>
+        <label class="feld"><span>API-Schlüssel für ${esc(dienstName(a.id))} (${esc(a.schluesselHinweis)})</span>
+          <span class="passwort-feld">
+            <input name="schluessel.${a.id}" type="password" value="${esc(e.schluessel[a.id] ?? '')}" spellcheck="false" autocapitalize="off" placeholder="Noch nicht eingetragen">
+            <button class="btn" type="button" data-zeigen>Zeigen</button>
+          </span></label>
+        <p class="leise-text">Schlüssel gibt es unter
+          <a href="${a.schluesselLink}" target="_blank" rel="noopener">${esc(new URL(a.schluesselLink).host)}</a>.
+          Er wird nur auf diesem Gerät gespeichert und nur an ${esc(dienstName(a.id))} gesendet.</p>
+        ${a.modelle.length > 1 ? `
+          <label class="feld"><span>Modell</span>
+            <select name="modell.${a.id}">
+              ${a.modelle.map((m) => `<option value="${m.id}"${m.id === modell ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}
+            </select></label>` : `<p class="leise-text">Modell: ${esc(a.modelle[0].name)}</p>`}` : ''}
+    </div>`;
 }
 
 export function zeigeEinstellungen(app) {
   app.setzeKopf({ titel: 'Einstellungen', zurueck: true });
   const e = ladeEinstellungen();
-  const anbieter = anbieterInfo(e.anbieter);
 
   app.inhalt.innerHTML = `
     <form class="einstellungen" autocomplete="off">
@@ -39,19 +73,8 @@ export function zeigeEinstellungen(app) {
         </div>
 
         <div class="nur-direkt">
-          <label class="feld"><span>Anbieter</span>
-            <select name="anbieter">
-              ${ANBIETER.map((a) => `<option value="${a.id}"${a.id === e.anbieter ? ' selected' : ''}>${esc(a.name)}</option>`).join('')}
-            </select></label>
-          <p class="leise-text">${esc(anbieter.info)}</p>
-          <label class="feld"><span>API-Schlüssel (${esc(anbieter.schluesselHinweis)})</span>
-            <span class="passwort-feld">
-              <input name="apiSchluessel" type="password" value="${esc(e.apiSchluessel)}" spellcheck="false" autocapitalize="off" placeholder="Noch nicht eingetragen">
-              <button class="btn" type="button" data-zeigen>Zeigen</button>
-            </span></label>
-          <p class="leise-text">Einen Schlüssel bekommst du unter
-            <a href="${anbieter.schluesselLink}" target="_blank" rel="noopener">${esc(new URL(anbieter.schluesselLink).host)}</a>.
-            Er wird nur auf diesem Gerät gespeichert und nur an den Anbieter gesendet.</p>
+          ${dienstHtml(e, 'erster')}
+          ${dienstHtml(e, 'zweiter')}
         </div>
 
         <div class="nur-server">
@@ -61,15 +84,8 @@ export function zeigeEinstellungen(app) {
             <input name="serverPasswort" type="password" value="${esc(e.serverPasswort)}" spellcheck="false" autocapitalize="off"></label>
         </div>
 
-        <div class="nur-direkt nur-server">
-          <label class="feld"><span>Modell</span>
-            <select name="modell">
-              ${anbieter.modelle.map((m) => `<option value="${m.id}"${m.id === e.modell ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}
-            </select></label>
-        </div>
-
         <button class="btn btn-breit" type="button" data-testen>Verbindung testen</button>
-        <p class="test-ergebnis" role="status" hidden></p>
+        <div class="test-ergebnis" role="status" hidden></div>
       </section>
 
       <section class="block">
@@ -86,9 +102,9 @@ export function zeigeEinstellungen(app) {
         </div>
         ${groqFeldNoetig(e) ? `
           <label class="feld"><span>Groq-API-Schlüssel (beginnt mit „gsk_“)</span>
-            <input name="groqSchluessel" type="password" value="${esc(e.groqSchluessel)}" spellcheck="false" autocapitalize="off" placeholder="Noch nicht eingetragen"></label>
+            <input name="schluessel.groq" type="password" value="${esc(e.groqSchluessel)}" spellcheck="false" autocapitalize="off" placeholder="Noch nicht eingetragen"></label>
           <p class="leise-text">Kostenlos unter <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a>.</p>` : ''}
-        <p class="leise-text">Aus dem gesprochenen Text macht anschließend die oben gewählte Texterkennung die einzelnen Einträge.</p>
+        <p class="leise-text">Aus dem gesprochenen Text machen anschließend die oben gewählten Dienste die einzelnen Einträge.</p>
       </section>
 
       <section class="block">
@@ -108,26 +124,29 @@ export function zeigeEinstellungen(app) {
 
   const zeigeAbschnitte = () => {
     const art = form.betriebsart.value;
-    form.querySelectorAll('.nur-direkt, .nur-server').forEach((el) => {
-      el.hidden = !((art === 'direkt' && el.classList.contains('nur-direkt'))
-        || (art === 'server' && el.classList.contains('nur-server')));
-    });
+    form.querySelector('.nur-direkt').hidden = art !== 'direkt';
+    form.querySelector('.nur-server').hidden = art !== 'server';
+  };
+
+  // Formularfelder → Einstellungen ("schluessel.groq" und "modell.google" gehören je zu einem Anbieter).
+  const liesFormular = () => {
+    const daten = { schluessel: {}, modelle: {}, bildschirmAn: form.bildschirmAn.checked };
+    for (const [name, wert] of new FormData(form)) {
+      if (name.startsWith('schluessel.')) daten.schluessel[name.slice(11)] = wert;
+      else if (name.startsWith('modell.')) daten.modelle[name.slice(7)] = wert;
+      else if (name !== 'bildschirmAn') daten[name] = wert;
+    }
+    return daten;
   };
 
   const speichere = () => {
-    // Nach einem Anbieterwechsel ist dieses Formular schon ersetzt – späte Ereignisse ignorieren.
+    // Nach einem Neuaufbau ist dieses Formular schon ersetzt – späte Ereignisse ignorieren.
     if (!form.isConnected) return;
-    const daten = Object.fromEntries(new FormData(form));
     const vorher = ladeEinstellungen();
-    if (daten.anbieter !== vorher.anbieter) {
-      // Anderer Anbieter: nur den Wechsel speichern und Schlüssel/Modelle des neuen Anbieters anzeigen.
-      speichereEinstellungen({ betriebsart: daten.betriebsart, anbieter: daten.anbieter, spracheingabe: daten.spracheingabe });
-      zeigeEinstellungen(app);
-      return;
-    }
-    speichereEinstellungen({ ...daten, bildschirmAn: form.bildschirmAn.checked });
-    // Ob das Groq-Feld bei der Spracheingabe nötig ist, hängt von diesen Angaben ab.
-    if (groqFeldNoetig(ladeEinstellungen()) !== groqFeldNoetig(vorher)) {
+    speichereEinstellungen(liesFormular());
+    const jetzt = ladeEinstellungen();
+    // Andere Dienste oder Spracheingabe gewählt: Seite mit den passenden Feldern neu aufbauen.
+    if (['anbieter', 'ausweichAnbieter', 'betriebsart', 'spracheingabe'].some((k) => vorher[k] !== jetzt[k])) {
       zeigeEinstellungen(app);
       return;
     }
@@ -145,27 +164,35 @@ export function zeigeEinstellungen(app) {
     form.querySelector('[data-install-bereich]').innerHTML = installHtml();
   });
 
-  form.querySelector('[data-zeigen]').addEventListener('click', (ev) => {
-    const feld = form.apiSchluessel;
-    feld.type = feld.type === 'password' ? 'text' : 'password';
-    ev.target.textContent = feld.type === 'password' ? 'Zeigen' : 'Verbergen';
+  form.querySelectorAll('[data-zeigen]').forEach((knopf) => {
+    knopf.addEventListener('click', () => {
+      const feld = knopf.previousElementSibling;
+      feld.type = feld.type === 'password' ? 'text' : 'password';
+      knopf.textContent = feld.type === 'password' ? 'Zeigen' : 'Verbergen';
+    });
   });
 
+  // Testet beide gewählten Dienste und zeigt je eine Zeile.
   form.querySelector('[data-testen]').addEventListener('click', async (ev) => {
     speichere();
+    const e2 = ladeEinstellungen();
     const knopf = ev.target;
     knopf.disabled = true;
     ergebnis.hidden = false;
     ergebnis.className = 'test-ergebnis';
     ergebnis.textContent = 'Teste Verbindung …';
-    try {
-      ergebnis.textContent = await testeVerbindung();
-      ergebnis.classList.add('ok');
-    } catch (fehler) {
-      ergebnis.textContent = fehler.message;
-      ergebnis.classList.add('fehler');
-    } finally {
-      knopf.disabled = false;
-    }
+
+    const pruefungen = e2.betriebsart === 'direkt'
+      ? [e2.anbieter, e2.ausweichAnbieter].filter(Boolean).map((id) => ({ name: dienstName(id), einstellungen: einstellungenFuer(id) }))
+      : [{ name: e2.betriebsart === 'server' ? 'Server' : 'Testmodus', einstellungen: e2 }];
+    const zeilen = await Promise.all(pruefungen.map(async (p) => {
+      try {
+        return { ok: true, text: `${p.name}: ${await testeVerbindung(p.einstellungen)}` };
+      } catch (fehler) {
+        return { ok: false, text: `${p.name}: ${fehler.message}` };
+      }
+    }));
+    ergebnis.innerHTML = zeilen.map((z) => `<p class="${z.ok ? 'ok' : 'fehler'}">${z.ok ? '✓' : '✗'} ${esc(z.text)}</p>`).join('');
+    knopf.disabled = false;
   });
 }
