@@ -1,8 +1,11 @@
-// Foto einlesen: Bild wählen → vorbereiten → erkennen → prüfen → in eine Liste übernehmen.
-// Seite "#/foto". Der Vorgang lebt nur im Speicher (das Foto wird nicht dauerhaft gespeichert).
+// Einlesen per Foto oder Sprache:
+//   Foto:    Bild wählen → vorbereiten → erkennen → prüfen → in eine Liste übernehmen.
+//   Sprache: zuhören → (Aufnahme abschreiben) → Text auswerten → prüfen → übernehmen.
+// Seite "#/foto". Der Vorgang lebt nur im Speicher (Foto und Ton werden nicht dauerhaft gespeichert).
 
 import { bereiteBildVor } from './bild.js';
-import { erkenne } from './recognizers/index.js';
+import { erkenne, erkenneText, transkribiere } from './recognizers/index.js';
+import { starteBrowserErkennung, starteAufnahme } from './sprache.js';
 import {
   datumsName, eindeutigerName, neueListe, findeDoppelt, zusammengefuehrt, uebernehmeEintraege, bekannteArtikel,
 } from './listen.js';
@@ -17,6 +20,7 @@ const galerieInput = document.getElementById('foto-galerie');
 // Fehler, bei denen ein Blick in die Einstellungen hilft.
 const EINSTELLUNGS_FEHLER = new Set([
   'kein-schluessel', 'schluessel-ungueltig', 'keine-berechtigung', 'modell', 'kein-server', 'server-passwort',
+  'nicht-unterstuetzt',
 ]);
 
 let app = null;
@@ -57,9 +61,10 @@ export function offenerVorgang() {
   return vorgang?.status === 'pruefen' ? vorgang : null;
 }
 
-/** Wird beim Verlassen der Foto-Seite aufgerufen: laufende Erkennung abbrechen. */
+/** Wird beim Verlassen der Seite aufgerufen: laufende Erkennung bzw. Mikrofon beenden. */
 export function verlasseFoto() {
-  if (vorgang?.status === 'laedt' || vorgang?.status === 'vorbereiten') {
+  if (['laedt', 'vorbereiten', 'zuhoeren', 'abschreiben'].includes(vorgang?.status)) {
+    beendeMikrofon(vorgang);
     vorgang.abbruch?.abort();
     vorgang = null;
   }
@@ -67,6 +72,7 @@ export function verlasseFoto() {
 
 async function starteVorgang(datei) {
   const v = {
+    art: 'foto',
     status: 'vorbereiten',
     zielListeId: naechstesZiel,
     herkunft: location.hash || '#/',
@@ -86,6 +92,118 @@ async function starteVorgang(datei) {
   if (vorgang === v) erkenneJetzt();
 }
 
+// ---------- Sprache ----------
+
+/** Startet das Diktieren einer Einkaufsliste. */
+export async function starteDiktat(zielListeId = null) {
+  const einstellungen = ladeEinstellungen();
+  if (!navigator.onLine && einstellungen.betriebsart !== 'demo') {
+    meldung('Keine Internetverbindung – Diktieren geht erst wieder online.');
+    return;
+  }
+  const v = {
+    art: 'sprache',
+    status: 'zuhoeren',
+    zielListeId,
+    herkunft: location.hash || '#/',
+    text: '',
+    whisper: einstellungen.spracheingabe === 'groq',
+    beginn: Date.now(),
+  };
+  vorgang = v;
+  zeigeSeite();
+
+  try {
+    if (v.whisper) {
+      if (!einstellungen.groqSchluessel) {
+        throw Object.assign(new Error('Für Groq Whisper fehlt noch der Groq-Schlüssel. Bitte in den Einstellungen eintragen oder dort die Spracherkennung des Handys wählen.'), { code: 'kein-schluessel' });
+      }
+      v.mikro = await starteAufnahme();
+      v.uhr = setInterval(() => {
+        const el = app.inhalt.querySelector('[data-uhr]');
+        if (el) el.textContent = uhrzeit(Date.now() - v.beginn);
+      }, 500);
+    } else {
+      v.mikro = starteBrowserErkennung({
+        beiText: (text) => {
+          v.text = text;
+          const el = app.inhalt.querySelector('[data-live-text]');
+          if (el) el.textContent = text || '…';
+        },
+        beiFehler: (fehler) => sprachFehler(v, fehler),
+      });
+    }
+  } catch (fehler) {
+    sprachFehler(v, fehler);
+  }
+}
+
+function uhrzeit(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function beendeMikrofon(v) {
+  clearInterval(v?.uhr);
+  v?.mikro?.abbrechen();
+  if (v) v.mikro = null;
+}
+
+function sprachFehler(v, fehler) {
+  if (vorgang !== v) return;
+  beendeMikrofon(v);
+  v.status = 'fehler';
+  v.fehler = { code: fehler.code ?? 'unbekannt', text: fehler.message };
+  if (location.hash === '#/foto') zeigeFoto();
+}
+
+/** „Fertig“ beim Diktieren: Zuhören beenden, ggf. abschreiben lassen, dann auswerten. */
+async function beendeDiktat(v) {
+  clearInterval(v.uhr);
+  const mikro = v.mikro;
+  v.mikro = null;
+  try {
+    if (v.whisper) {
+      v.status = 'abschreiben';
+      v.abbruch = new AbortController();
+      zeigeFoto();
+      v.aufnahme = await mikro.stoppe();
+      await schreibeAb(v);
+    } else {
+      v.text = (await mikro.stoppe()).trim();
+    }
+  } catch (fehler) {
+    if (fehler.code !== 'abgebrochen') sprachFehler(v, fehler);
+    return;
+  }
+  if (vorgang !== v) return;
+  if (!v.text) {
+    sprachFehler(v, { code: 'nichts-gehoert', message: 'Es wurde nichts verstanden. Bitte noch einmal deutlich sprechen.' });
+    return;
+  }
+  erkenneJetzt();
+}
+
+async function schreibeAb(v) {
+  v.text = await transkribiere(v.aufnahme, v.abbruch.signal, { bekannteArtikel: bekannteArtikel(app.listen()) });
+}
+
+/** „Erneut versuchen“: je nach Stand neu abschreiben oder neu auswerten. */
+async function wiederhole(v) {
+  if (v.art === 'sprache' && !v.text && v.aufnahme) {
+    v.status = 'abschreiben';
+    v.abbruch = new AbortController();
+    zeigeFoto();
+    try {
+      await schreibeAb(v);
+    } catch (fehler) {
+      if (fehler.code !== 'abgebrochen') sprachFehler(v, fehler);
+      return;
+    }
+  }
+  erkenneJetzt();
+}
+
 function zeigeSeite() {
   if (location.hash === '#/foto') zeigeFoto();
   else location.hash = '#/foto';
@@ -98,7 +216,10 @@ async function erkenneJetzt() {
   zeigeFoto();
 
   try {
-    const ergebnis = await erkenne(v.bild, v.abbruch.signal, { bekannteArtikel: bekannteArtikel(app.listen()) });
+    const kontext = { bekannteArtikel: bekannteArtikel(app.listen()) };
+    const ergebnis = v.art === 'sprache'
+      ? await erkenneText(v.text, v.abbruch.signal, kontext)
+      : await erkenne(v.bild, v.abbruch.signal, kontext);
     if (vorgang !== v) return;
     const listen = app.listen();
     const ziel = listen.some((l) => l.id === v.zielListeId) ? v.zielListeId : 'neu';
@@ -128,39 +249,68 @@ async function erkenneJetzt() {
 // ---------- Anzeige ----------
 
 export function zeigeFoto() {
-  app.setzeKopf({ titel: 'Zettel einlesen', zurueck: true });
-  const { inhalt } = app;
   const v = vorgang;
+  app.setzeKopf({ titel: v?.art === 'sprache' ? 'Liste diktieren' : 'Zettel einlesen', zurueck: true });
+  const { inhalt } = app;
 
   if (!v) {
     location.hash = '#/';
     return;
   }
 
+  const sprache = v.art === 'sprache';
   const bildHtml = v.bild
     ? `<img class="foto-vorschau" src="${v.bild.dataUrl}" alt="Fotografierter Einkaufszettel" data-aktion="bild-gross">`
     : '';
+  const textHtml = sprache && v.text ? `<blockquote class="diktat-text">„${esc(v.text)}“</blockquote>` : '';
+  // Bei einem Fehler: neu versuchen lohnt, wenn schon Foto/Aufnahme/Text da ist (außer nichts erkannt).
+  const wiederholbar = (v.bild || v.text || v.aufnahme)
+    && !['nichts-erkannt', 'nichts-gehoert', 'not-allowed', 'nicht-unterstuetzt', 'kein-schluessel'].includes(v.fehler?.code);
+  const neuStarten = sprache
+    ? '<button class="btn" type="button" data-aktion="neu-sprechen">Neu sprechen</button>'
+    : '<button class="btn" type="button" data-aktion="anderes-foto">Anderes Foto</button>';
 
-  if (v.status === 'vorbereiten' || v.status === 'laedt') {
+  if (v.status === 'zuhoeren') {
     inhalt.innerHTML = `
       <div class="foto-status">
-        ${bildHtml}
+        <div class="mikro-kreis" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        </div>
+        <p class="leer-titel">${v.whisper ? 'Aufnahme läuft' : 'Ich höre zu …'}</p>
+        <p class="leise-text">Sprich deine Einkaufsliste, z. B. „zwei Liter Milch, ein Brot und 500 Gramm Hackfleisch“. Pausen sind kein Problem.</p>
+        ${v.whisper
+          ? `<p class="aufnahme-uhr" data-uhr>${uhrzeit(Date.now() - v.beginn)}</p>`
+          : `<blockquote class="diktat-text live" data-live-text>${esc(v.text) || '…'}</blockquote>`}
+        <div class="knopf-reihe">
+          <button class="btn" type="button" data-aktion="abbrechen">Abbrechen</button>
+          <button class="btn btn-primaer" type="button" data-aktion="fertig">Fertig</button>
+        </div>
+      </div>`;
+  } else if (['vorbereiten', 'abschreiben', 'laedt'].includes(v.status)) {
+    const titel = {
+      vorbereiten: 'Foto wird vorbereitet …',
+      abschreiben: 'Aufnahme wird abgeschrieben …',
+      laedt: sprache ? 'Liste wird erstellt …' : 'Zettel wird gelesen …',
+    }[v.status];
+    inhalt.innerHTML = `
+      <div class="foto-status">
+        ${bildHtml}${textHtml}
         <div class="lade-kreis" aria-hidden="true"></div>
-        <p class="leer-titel">${v.status === 'vorbereiten' ? 'Foto wird vorbereitet …' : 'Zettel wird gelesen …'}</p>
-        <p class="leise-text">Das dauert meist 10 bis 20 Sekunden.</p>
+        <p class="leer-titel">${titel}</p>
+        <p class="leise-text">${sprache ? 'Das dauert meist nur ein paar Sekunden.' : 'Das dauert meist 10 bis 20 Sekunden.'}</p>
         <button class="btn" type="button" data-aktion="abbrechen">Abbrechen</button>
       </div>`;
   } else if (v.status === 'fehler') {
     inhalt.innerHTML = `
       <div class="foto-status">
-        ${bildHtml}
+        ${bildHtml}${textHtml}
         <div class="fehler-box" role="alert">
           <strong>Das hat nicht geklappt</strong>
           <p>${esc(v.fehler.text)}</p>
         </div>
         <div class="knopf-reihe">
-          ${v.bild && v.fehler.code !== 'nichts-erkannt' ? '<button class="btn btn-primaer" type="button" data-aktion="nochmal">Erneut versuchen</button>' : ''}
-          <button class="btn${v.fehler.code === 'nichts-erkannt' ? ' btn-primaer' : ''}" type="button" data-aktion="anderes-foto">Anderes Foto</button>
+          ${wiederholbar ? '<button class="btn btn-primaer" type="button" data-aktion="nochmal">Erneut versuchen</button>' : ''}
+          ${neuStarten}
           ${EINSTELLUNGS_FEHLER.has(v.fehler.code) ? '<a class="btn" href="#/einstellungen">Einstellungen</a>' : ''}
         </div>
       </div>`;
@@ -180,14 +330,23 @@ function zielListe(v) {
 function pruefHtml(v) {
   const anzahl = v.eintraege.filter((e) => e.uebernehmen).length;
   const listen = [...app.listen()].sort((a, b) => b.erstelltAm.localeCompare(a.erstelltAm));
-  return `
+  const kopf = v.art === 'sprache'
+    ? `
+    <div class="foto-kopf spalte">
+      <p class="leer-titel">${v.eintraege.length} Artikel verstanden</p>
+      <blockquote class="diktat-text">„${esc(v.text)}“</blockquote>
+      <p class="leise-text">Bitte prüfen und bei Bedarf korrigieren.</p>
+    </div>`
+    : `
     <div class="foto-kopf">
       <img class="foto-vorschau klein" src="${v.bild.dataUrl}" alt="Fotografierter Einkaufszettel" data-aktion="bild-gross">
       <div>
         <p class="leer-titel">${v.eintraege.length} Artikel erkannt</p>
         <p class="leise-text">Bitte prüfen und bei Bedarf korrigieren. Tippe aufs Foto zum Vergrößern.</p>
       </div>
-    </div>
+    </div>`;
+  return `
+    ${kopf}
     ${v.hinweis ? `<p class="info-box">${esc(v.hinweis)}</p>` : ''}
 
     <ul class="pruef-liste">
@@ -208,7 +367,9 @@ function pruefHtml(v) {
     </section>
 
     <div class="aktionsleiste">
-      <button class="btn" type="button" data-aktion="anderes-foto">Neues Foto</button>
+      ${v.art === 'sprache'
+        ? '<button class="btn" type="button" data-aktion="neu-sprechen">Neu sprechen</button>'
+        : '<button class="btn" type="button" data-aktion="anderes-foto">Neues Foto</button>'}
       <button class="btn btn-primaer" type="button" data-aktion="uebernehmen"${anzahl === 0 ? ' disabled' : ''}>
         ${anzahl} Artikel übernehmen</button>
     </div>`;
@@ -237,7 +398,7 @@ function pruefEintragHtml(v, e, i) {
 
 function hinweiseHtml(v, e) {
   const teile = [];
-  if (e.unsicher) teile.push('<p class="pruef-hinweis warnung">Schwer lesbar – bitte prüfen</p>');
+  if (e.unsicher) teile.push(`<p class="pruef-hinweis warnung">${v.art === 'sprache' ? 'Nicht sicher verstanden' : 'Schwer lesbar'} – bitte prüfen</p>`);
   const liste = zielListe(v);
   const vorhanden = liste && e.name.trim() ? findeDoppelt(liste, e.name) : null;
   if (vorhanden) {
@@ -308,15 +469,23 @@ async function beiKlick(ev) {
       knopf.classList.toggle('gross');
       break;
     case 'abbrechen':
+      beendeMikrofon(v);
       v.abbruch?.abort();
       vorgang = null;
       location.hash = v.herkunft;
       break;
+    case 'fertig':
+      await beendeDiktat(v);
+      break;
     case 'nochmal':
-      erkenneJetzt();
+      await wiederhole(v);
       break;
     case 'anderes-foto':
       waehleFoto(v.zielListeId);
+      break;
+    case 'neu-sprechen':
+      vorgang = null;
+      await starteDiktat(v.zielListeId);
       break;
     case 'entfernen': {
       const { e } = eintragZu(knopf);

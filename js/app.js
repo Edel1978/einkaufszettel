@@ -12,7 +12,7 @@ import {
 import { EINHEITEN, KATEGORIEN, kategorieName, rateKategorie, merkeKategorie } from './kategorien.js';
 import { esc, formatZahl, leseZahl } from './util.js';
 import { eingabe, bestaetige, menue, formular, meldung } from './dialoge.js';
-import { initFoto, waehleFoto, zeigeFoto, verlasseFoto, offenerVorgang } from './foto.js';
+import { initFoto, waehleFoto, starteDiktat, zeigeFoto, verlasseFoto, offenerVorgang } from './foto.js';
 import { zeigeEinstellungen } from './einstellungen-seite.js';
 import { ladeEinstellungen } from './einstellungen.js';
 import { halteBildschirmAn } from './wachhalten.js';
@@ -20,6 +20,9 @@ import {
   registriereServiceWorker, kannInstallieren, installiere, beiInstallierbarkeit,
   installHinweisAusgeblendet, blendeInstallHinweisAus,
 } from './installieren.js';
+
+const KAMERA_ICON = '<svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+const MIKRO_ICON = '<svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
 
 const inhalt = document.getElementById('inhalt');
 const titel = document.getElementById('titel');
@@ -142,7 +145,7 @@ function zeigeUebersicht() {
     ${sortiert.length === 0 ? `
       <div class="leer">
         <p class="leer-titel">Noch keine Listen</p>
-        <p>Fotografiere deinen Einkaufszettel oder lege eine Liste von Hand an.</p>
+        <p>Fotografiere deinen Einkaufszettel, sprich deine Liste ein oder lege sie von Hand an.</p>
       </div>` : `
       <ul class="karten">
         ${sortiert.map((l) => {
@@ -163,10 +166,13 @@ function zeigeUebersicht() {
         }).join('')}
       </ul>`}
     <div class="aktionsleiste">
-      <button id="neue-liste" class="btn" type="button">+ Neue Liste</button>
+      <button id="neue-liste" class="btn" type="button">+ Liste</button>
+      <button id="diktieren" class="btn btn-primaer" type="button">
+        ${MIKRO_ICON}
+        Sprechen</button>
       <button id="foto-einlesen" class="btn btn-primaer" type="button">
-        <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-        Zettel fotografieren</button>
+        ${KAMERA_ICON}
+        Foto</button>
     </div>
   `;
 
@@ -181,6 +187,7 @@ function zeigeUebersicht() {
   });
   inhalt.querySelector('#neue-liste').addEventListener('click', legeListeAn);
   inhalt.querySelector('#foto-einlesen').addEventListener('click', () => waehleFoto(null));
+  inhalt.querySelector('#diktieren').addEventListener('click', () => starteDiktat(null));
   inhalt.querySelectorAll('[data-menue]').forEach((knopf) => {
     knopf.addEventListener('click', () => {
       const liste = listen.find((l) => l.id === knopf.dataset.menue);
@@ -266,8 +273,11 @@ function zeigeListe(liste) {
     <form id="eingabe" class="eingabe" autocomplete="off">
       <div class="eingabe-zeile">
         <input name="name" class="eingabe-name" type="text" placeholder="Artikel, z. B. Milch" aria-label="Artikel" required>
+        <button class="btn foto-knopf" type="button" data-diktat aria-label="Artikel diktieren und hinzufügen">
+          ${MIKRO_ICON}
+        </button>
         <button class="btn foto-knopf" type="button" data-foto aria-label="Zettel fotografieren und hinzufügen">
-          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+          ${KAMERA_ICON}
         </button>
       </div>
       <div class="eingabe-zeile">
@@ -297,6 +307,7 @@ function zeigeListe(liste) {
 
   const form = inhalt.querySelector('#eingabe');
   form.querySelector('[data-foto]').addEventListener('click', () => waehleFoto(liste.id));
+  form.querySelector('[data-diktat]').addEventListener('click', () => starteDiktat(liste.id));
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const daten = new FormData(form);

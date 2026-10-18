@@ -2,7 +2,7 @@
 // Der API-Schlüssel kommt aus den Einstellungen und wird nur an api.anthropic.com gesendet.
 
 import {
-  anweisungMit, ANTWORT_SCHEMA, ErkennungsFehler, werteAntwortAus,
+  anweisungMit, textNachricht, ANTWORT_SCHEMA, ErkennungsFehler, werteAntwortAus,
   fehlerAusAntwort, sicherFetch, fehlerNachricht,
 } from './gemeinsam.js';
 
@@ -38,19 +38,26 @@ async function sendeAnfrage(schluessel, anfrage, mitAusweichModell, signal) {
   });
 }
 
-export async function erkenne(bild, einstellungen, signal, kontext = {}) {
+export function erkenne(bild, einstellungen, signal, kontext = {}) {
+  return frage(einstellungen, anweisungMit(kontext.bekannteArtikel), [
+    { type: 'image', source: { type: 'base64', media_type: bild.mediaType, data: bild.base64 } },
+    { type: 'text', text: 'Lies diesen Einkaufszettel.' },
+  ], signal);
+}
+
+export function erkenneText(text, einstellungen, signal, kontext = {}) {
+  return frage(einstellungen, anweisungMit(kontext.bekannteArtikel, 'text'), [
+    { type: 'text', text: textNachricht(text) },
+  ], signal);
+}
+
+async function frage(einstellungen, anweisung, inhalt, signal) {
   const schluessel = pruefeSchluessel(einstellungen);
   const anfrage = {
     model: einstellungen.modell,
     max_tokens: 16000,
-    system: anweisungMit(kontext.bekannteArtikel),
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: bild.mediaType, data: bild.base64 } },
-        { type: 'text', text: 'Lies diesen Einkaufszettel.' },
-      ],
-    }],
+    system: anweisung,
+    messages: [{ role: 'user', content: inhalt }],
     output_config: {
       effort: 'low', // reines Ablesen braucht kein langes Nachdenken – schneller und günstiger
       format: { type: 'json_schema', schema: ANTWORT_SCHEMA },
@@ -71,7 +78,7 @@ export async function erkenne(bild, einstellungen, signal, kontext = {}) {
 
   const daten = await antwort.json();
   if (daten.stop_reason === 'refusal') {
-    throw new ErkennungsFehler('abgelehnt', 'Die KI hat die Anfrage abgelehnt. Bitte ein anderes Foto versuchen.');
+    throw new ErkennungsFehler('abgelehnt', 'Die KI hat die Anfrage abgelehnt. Bitte erneut versuchen.');
   }
   if (daten.stop_reason === 'max_tokens') {
     throw new ErkennungsFehler('zu-lang', 'Der Zettel ist zu lang für eine Anfrage. Bitte in mehreren Fotos einlesen.');

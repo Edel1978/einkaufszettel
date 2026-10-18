@@ -6,15 +6,8 @@
 
 import { KATEGORIEN, STANDARD_KATEGORIE, EINHEITEN, rateKategorie, gelernteKategorie } from '../kategorien.js';
 
-export const ANWEISUNG = `Du liest Fotos von handgeschriebenen Einkaufszetteln (meist auf Deutsch) und wandelst sie in eine saubere Einkaufsliste um.
-
-Regeln:
-- Jeder Artikel wird ein eigener Eintrag. Stehen mehrere Artikel in einer Zeile (z. B. durch Komma getrennt), trenne sie.
-- Ein Artikel kann über ein Zeilenende weiterlaufen (z. B. „1 frische“ / „Sahne“). Eine Zahl oder Mengenangabe am Zeilenanfang beginnt aber fast immer einen neuen Artikel – hänge sie nicht an den vorherigen an.
-- Durchgestrichene oder ausgestrichene Artikel lässt du weg. Ebenso Überschriften, Datumsangaben, Notizen ohne Artikel und Kritzeleien.
-- Lies jedes Wort Buchstabe für Buchstabe. Ersetze es nicht durch ein ähnliches, gebräuchlicheres Wort, wenn die geschriebenen Buchstaben nicht dazu passen. Zettel enthalten oft Marken- und Produktnamen (Brotsorten, Fertigsuppen, Kaffeesorten usw.) – erkennst du einen solchen Namen, verwende ihn.
-- Schreibe Artikelnamen in üblicher deutscher Schreibweise mit großem Anfangsbuchstaben und korrigiere Rechtschreibfehler. Schreibe Abkürzungen aus, wenn sie eindeutig sind (z. B. „Toi.-Papier“ → „Toilettenpapier“). Behalte Marken und genaue Angaben bei (z. B. „Milch 3,5 %“).
-- Ist eine Zahl überschrieben oder korrigiert, gilt die zuletzt geschriebene Zahl; setze dann "unsicher" auf true.
+// Regeln, die für Fotos und diktierten Text gleich sind.
+const REGELN_ARTIKEL = `- Schreibe Artikelnamen in üblicher deutscher Schreibweise mit großem Anfangsbuchstaben und korrigiere Rechtschreibfehler. Behalte Marken und genaue Angaben bei (z. B. „Milch 3,5 %“).
 - Menge und Einheit trennst du vom Namen:
   - „2x Milch“, „2 Milch“ → menge 2, einheit "" (reine Stückzahl ohne Einheit)
   - „500g Hack“ → name "Hackfleisch", menge 500, einheit "g"
@@ -24,20 +17,49 @@ Regeln:
 - Verwende für die Einheit möglichst eine dieser Schreibweisen: ${EINHEITEN.join(', ')}.
 - Ordne jeden Artikel einer Kategorie zu (Feld "kategorie", nur die ID):
 ${KATEGORIEN.map((k) => `  - ${k.id}: ${k.name} (z. B. ${k.beispiele})`).join('\n')}
-- Kommt derselbe Artikel mehrfach vor, fasse ihn zu einem Eintrag zusammen.
+- Kommt derselbe Artikel mehrfach vor, fasse ihn zu einem Eintrag zusammen.`;
+
+export const ANWEISUNG = `Du liest Fotos von handgeschriebenen Einkaufszetteln (meist auf Deutsch) und wandelst sie in eine saubere Einkaufsliste um.
+
+Regeln:
+- Jeder Artikel wird ein eigener Eintrag. Stehen mehrere Artikel in einer Zeile (z. B. durch Komma getrennt), trenne sie.
+- Ein Artikel kann über ein Zeilenende weiterlaufen (z. B. „1 frische“ / „Sahne“). Eine Zahl oder Mengenangabe am Zeilenanfang beginnt aber fast immer einen neuen Artikel – hänge sie nicht an den vorherigen an.
+- Durchgestrichene oder ausgestrichene Artikel lässt du weg. Ebenso Überschriften, Datumsangaben, Notizen ohne Artikel und Kritzeleien.
+- Lies jedes Wort Buchstabe für Buchstabe. Ersetze es nicht durch ein ähnliches, gebräuchlicheres Wort, wenn die geschriebenen Buchstaben nicht dazu passen. Zettel enthalten oft Marken- und Produktnamen (Brotsorten, Fertigsuppen, Kaffeesorten usw.) – erkennst du einen solchen Namen, verwende ihn.
+- Schreibe Abkürzungen aus, wenn sie eindeutig sind (z. B. „Toi.-Papier“ → „Toilettenpapier“).
+- Ist eine Zahl überschrieben oder korrigiert, gilt die zuletzt geschriebene Zahl; setze dann "unsicher" auf true.
+${REGELN_ARTIKEL}
 - Ist ein Wort schwer lesbar, gib deine beste Vermutung an und setze "unsicher" auf true. Sonst false.
 - Ist auf dem Foto kein Einkaufszettel oder nichts lesbar, gib eine leere Liste zurück und erkläre kurz in "hinweis", woran es liegt (z. B. „Bild zu unscharf“). Sonst ist "hinweis" leer.`;
 
+export const ANWEISUNG_TEXT = `Du bekommst einen gesprochenen Text, den eine Spracherkennung aufgeschrieben hat (meist auf Deutsch). Der Nutzer hat darin diktiert, was er einkaufen möchte. Wandle das in eine saubere Einkaufsliste um.
+
+Regeln:
+- Jeder Artikel wird ein eigener Eintrag. Artikel sind oft durch „und“, Kommas oder Pausen getrennt – manchmal fehlt jede Trennung („Milch Brot Eier“).
+- Ignoriere Füllwörter und Sätze drumherum („ich brauche noch“, „äh“, „und dann noch“, „das war's“).
+- Zahlwörter werden zu Zahlen: „zwei Liter Milch“ → menge 2, einheit "l"; „ein halbes Kilo Hack“ → menge 0.5, einheit "kg"; „ein Pfund Kaffee“ → menge 500, einheit "g"; „ein Brot“ → menge 1.
+- Korrigiert sich der Nutzer („drei Äpfel, nein, vier“ oder „Butter – ach nee, doch nicht“), gilt nur die Korrektur.
+- Spracherkennungen verhören sich manchmal. Ergibt ein Wort beim Einkaufen keinen Sinn, nimm den naheliegenden Artikel, der ähnlich klingt, und setze "unsicher" auf true. Sonst false.
+${REGELN_ARTIKEL}
+- Enthält der Text keine Artikel, gib eine leere Liste zurück und erkläre kurz in "hinweis", woran es liegt. Sonst ist "hinweis" leer.`;
+
 /**
  * Anweisung plus die Artikel, die der Nutzer schon auf seinen Listen hatte.
- * So erkennt die KI wiederkehrende Produkte (z. B. Markennamen) bei schwer lesbarer Schrift sicherer.
+ * So erkennt die KI wiederkehrende Produkte (z. B. Markennamen) sicherer.
+ * art: 'foto' (Standard) oder 'text' (diktiert).
  */
-export function anweisungMit(bekannteArtikel = []) {
-  if (bekannteArtikel.length === 0) return ANWEISUNG;
-  return `${ANWEISUNG}
+export function anweisungMit(bekannteArtikel = [], art = 'foto') {
+  const basis = art === 'text' ? ANWEISUNG_TEXT : ANWEISUNG;
+  if (bekannteArtikel.length === 0) return basis;
+  return `${basis}
 
-Diese Artikel hat der Nutzer schon früher eingekauft (häufigste zuerst). Sieht ein Wort auf dem Zettel einem davon ähnlich, ist vermutlich dieser Artikel gemeint – übernimm dann diese Schreibweise. Andere Artikel sind natürlich trotzdem möglich:
+Diese Artikel hat der Nutzer schon früher eingekauft (häufigste zuerst). Ähnelt ein Wort einem davon, ist vermutlich dieser Artikel gemeint – übernimm dann diese Schreibweise. Andere Artikel sind natürlich trotzdem möglich:
 ${bekannteArtikel.join(', ')}`;
+}
+
+/** Text, mit dem der diktierte Inhalt an die KI geht. */
+export function textNachricht(text) {
+  return `Diktierte Einkaufsliste:\n"""\n${text}\n"""`;
 }
 
 export const ANTWORT_SCHEMA = {

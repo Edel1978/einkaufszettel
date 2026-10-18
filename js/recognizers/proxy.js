@@ -8,6 +8,9 @@
 //     Antwort 200: { eintraege: [...], hinweis }   (Format wie bei der KI)
 //     Antwort Fehler: { nachricht }
 //
+//   POST {serverUrl}/api/erkennen-text   (diktierte Liste)
+//     Body:   { text, modell, bekannteArtikel: [...] }   – Antwort wie oben
+//
 //   GET {serverUrl}/api/status  → 200, wenn Server und Passwort stimmen
 
 import { ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht } from './gemeinsam.js';
@@ -36,6 +39,18 @@ export async function erkenne(bild, einstellungen, signal, kontext = {}) {
       modell: einstellungen.modell,
       bekannteArtikel: kontext.bekannteArtikel ?? [],
     }),
+    signal,
+  });
+  if (antwort.status === 401) throw new ErkennungsFehler('server-passwort', 'Das Server-Passwort ist falsch.');
+  if (!antwort.ok) throw fehlerAusAntwort(antwort.status, await fehlerNachricht(antwort));
+  return werteAntwortAus(await antwort.json());
+}
+
+export async function erkenneText(text, einstellungen, signal, kontext = {}) {
+  const antwort = await sicherFetch(`${basisUrl(einstellungen)}/api/erkennen-text`, {
+    method: 'POST',
+    headers: kopfzeilen(einstellungen),
+    body: JSON.stringify({ text, modell: einstellungen.modell, bekannteArtikel: kontext.bekannteArtikel ?? [] }),
     signal,
   });
   if (antwort.status === 401) throw new ErkennungsFehler('server-passwort', 'Das Server-Passwort ist falsch.');

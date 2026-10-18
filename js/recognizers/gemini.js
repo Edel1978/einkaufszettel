@@ -3,7 +3,7 @@
 // Der API-Schlüssel kommt aus den Einstellungen und wird nur an generativelanguage.googleapis.com gesendet.
 
 import {
-  anweisungMit, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
+  anweisungMit, textNachricht, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
 } from './gemeinsam.js';
 import { KATEGORIEN } from '../kategorien.js';
 import { anbieterInfo } from '../einstellungen.js';
@@ -56,17 +56,22 @@ function geminiFehler(status, nachricht) {
   return fehlerAusAntwort(status, nachricht);
 }
 
-export async function erkenne(bild, einstellungen, signal, kontext = {}) {
+export function erkenne(bild, einstellungen, signal, kontext = {}) {
+  return frage(einstellungen, anweisungMit(kontext.bekannteArtikel), [
+    { inline_data: { mime_type: bild.mediaType, data: bild.base64 } },
+    { text: 'Lies diesen Einkaufszettel.' },
+  ], signal);
+}
+
+export function erkenneText(text, einstellungen, signal, kontext = {}) {
+  return frage(einstellungen, anweisungMit(kontext.bekannteArtikel, 'text'), [{ text: textNachricht(text) }], signal);
+}
+
+async function frage(einstellungen, anweisung, teile, signal) {
   const schluessel = pruefeSchluessel(einstellungen);
   const anfrage = {
-    systemInstruction: { parts: [{ text: anweisungMit(kontext.bekannteArtikel) }] },
-    contents: [{
-      role: 'user',
-      parts: [
-        { inline_data: { mime_type: bild.mediaType, data: bild.base64 } },
-        { text: 'Lies diesen Einkaufszettel.' },
-      ],
-    }],
+    systemInstruction: { parts: [{ text: anweisung }] },
+    contents: [{ role: 'user', parts: teile }],
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: GEMINI_SCHEMA,
@@ -86,7 +91,7 @@ export async function erkenne(bild, einstellungen, signal, kontext = {}) {
 
   const daten = await antwort.json();
   if (daten.promptFeedback?.blockReason) {
-    throw new ErkennungsFehler('abgelehnt', 'Gemini hat das Foto abgelehnt. Bitte ein anderes Foto versuchen.');
+    throw new ErkennungsFehler('abgelehnt', 'Gemini hat die Anfrage abgelehnt. Bitte erneut versuchen.');
   }
   const kandidat = daten.candidates?.[0];
   if (kandidat?.finishReason === 'MAX_TOKENS') {

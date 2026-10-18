@@ -1,7 +1,10 @@
 // Seite "#/einstellungen": Erkennungsdienst, API-Schlüssel, Modell, Server.
 // Änderungen werden sofort gespeichert.
 
-import { BETRIEBSARTEN, ANBIETER, anbieterInfo, ladeEinstellungen, speichereEinstellungen } from './einstellungen.js';
+import {
+  BETRIEBSARTEN, ANBIETER, SPRACHEINGABEN, anbieterInfo, ladeEinstellungen, speichereEinstellungen,
+} from './einstellungen.js';
+import { browserErkennungVerfuegbar, aufnahmeVerfuegbar } from './sprache.js';
 import { testeVerbindung } from './recognizers/index.js';
 import { kannInstallieren, istInstalliert, installiere } from './installieren.js';
 import { esc } from './util.js';
@@ -11,6 +14,11 @@ function installHtml() {
   if (kannInstallieren()) return '<button class="btn btn-primaer btn-breit" type="button" data-installieren>Als App auf dem Startbildschirm installieren</button>';
   return `<p class="leise-text">Zum Installieren in Chrome oben rechts auf ⋮ tippen und
     „Zum Startbildschirm hinzufügen“ bzw. „App installieren“ wählen.</p>`;
+}
+
+/** Eigenes Feld für den Groq-Schlüssel, wenn Whisper genutzt wird, Groq aber nicht der Foto-Anbieter ist. */
+function groqFeldNoetig(e) {
+  return e.spracheingabe === 'groq' && !(e.betriebsart === 'direkt' && e.anbieter === 'groq');
 }
 
 export function zeigeEinstellungen(app) {
@@ -65,6 +73,25 @@ export function zeigeEinstellungen(app) {
       </section>
 
       <section class="block">
+        <h2>Spracheingabe</h2>
+        <div class="optionen">
+          ${SPRACHEINGABEN.map((s) => {
+            const fehlt = s.id === 'browser' ? !browserErkennungVerfuegbar() : !aufnahmeVerfuegbar();
+            return `
+            <label class="option">
+              <input type="radio" name="spracheingabe" value="${s.id}"${s.id === e.spracheingabe ? ' checked' : ''}>
+              <span><strong>${esc(s.name)}</strong><small>${esc(s.info)}${fehlt ? ' – <em>auf diesem Gerät nicht verfügbar</em>' : ''}</small></span>
+            </label>`;
+          }).join('')}
+        </div>
+        ${groqFeldNoetig(e) ? `
+          <label class="feld"><span>Groq-API-Schlüssel (beginnt mit „gsk_“)</span>
+            <input name="groqSchluessel" type="password" value="${esc(e.groqSchluessel)}" spellcheck="false" autocapitalize="off" placeholder="Noch nicht eingetragen"></label>
+          <p class="leise-text">Kostenlos unter <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a>.</p>` : ''}
+        <p class="leise-text">Aus dem gesprochenen Text macht anschließend die oben gewählte Texterkennung die einzelnen Einträge.</p>
+      </section>
+
+      <section class="block">
         <h2>App</h2>
         <label class="option">
           <input type="checkbox" name="bildschirmAn"${e.bildschirmAn ? ' checked' : ''}>
@@ -91,13 +118,19 @@ export function zeigeEinstellungen(app) {
     // Nach einem Anbieterwechsel ist dieses Formular schon ersetzt – späte Ereignisse ignorieren.
     if (!form.isConnected) return;
     const daten = Object.fromEntries(new FormData(form));
-    if (daten.anbieter !== ladeEinstellungen().anbieter) {
+    const vorher = ladeEinstellungen();
+    if (daten.anbieter !== vorher.anbieter) {
       // Anderer Anbieter: nur den Wechsel speichern und Schlüssel/Modelle des neuen Anbieters anzeigen.
-      speichereEinstellungen({ betriebsart: daten.betriebsart, anbieter: daten.anbieter });
+      speichereEinstellungen({ betriebsart: daten.betriebsart, anbieter: daten.anbieter, spracheingabe: daten.spracheingabe });
       zeigeEinstellungen(app);
       return;
     }
     speichereEinstellungen({ ...daten, bildschirmAn: form.bildschirmAn.checked });
+    // Ob das Groq-Feld bei der Spracheingabe nötig ist, hängt von diesen Angaben ab.
+    if (groqFeldNoetig(ladeEinstellungen()) !== groqFeldNoetig(vorher)) {
+      zeigeEinstellungen(app);
+      return;
+    }
     ergebnis.hidden = true;
     zeigeAbschnitte();
   };

@@ -6,7 +6,7 @@
 // - Auf dem PC (localhost): immer zuerst aus dem Netz, damit Änderungen sofort sichtbar sind.
 // Anfragen an andere Server (z. B. die KI-Dienste) werden nie zwischengespeichert.
 
-const CACHE = 'einkaufszettel-v1';
+const CACHE = 'einkaufszettel-v2';
 
 const APP_DATEIEN = [
   './',
@@ -28,9 +28,11 @@ const APP_DATEIEN = [
   'js/util.js',
   'js/wachhalten.js',
   'js/installieren.js',
+  'js/sprache.js',
   'js/recognizers/index.js',
   'js/recognizers/gemeinsam.js',
   'js/recognizers/gemini.js',
+  'js/recognizers/groq.js',
   'js/recognizers/anthropic-direkt.js',
   'js/recognizers/proxy.js',
   'js/recognizers/demo.js',

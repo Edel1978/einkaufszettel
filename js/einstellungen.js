@@ -41,6 +41,23 @@ export const ANBIETER = [
       { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5 – am günstigsten (unter 0,2 Cent/Foto)' },
     ],
   },
+  {
+    id: 'groq',
+    name: 'Groq (kostenloser Tarif)',
+    schluesselHinweis: 'beginnt mit „gsk_“',
+    schluesselLink: 'https://console.groq.com/keys',
+    info: 'Kostenlos mit Tageslimit und sehr schnell. Das Foto-Modell ist bei Groq noch eine Vorschau-Version und kann sich ändern.',
+    // Stand 18.10.2026: Bilder liest bei Groq nur dieses Modell (Vorschau).
+    modelle: [
+      { id: 'qwen/qwen3.8-27b', name: 'Qwen 3.8 27B – liest Fotos (Vorschau)', denken: 'none' },
+    ],
+  },
+];
+
+/** Womit gesprochene Sprache in Text umgewandelt wird. */
+export const SPRACHEINGABEN = [
+  { id: 'browser', name: 'Spracherkennung des Handys', info: 'Kostenlos, ohne Schlüssel; der Text erscheint schon beim Sprechen.' },
+  { id: 'groq', name: 'Groq Whisper', info: 'Sehr genau, auch bei Produktnamen. Braucht einen kostenlosen Groq-Schlüssel.' },
 ];
 
 const STANDARD = {
@@ -51,6 +68,7 @@ const STANDARD = {
   serverUrl: '',
   serverPasswort: '',
   bildschirmAn: true, // Bildschirm in der Einkaufsliste nicht ausgehen lassen
+  spracheingabe: 'browser',
 };
 
 export function anbieterInfo(id) {
@@ -78,7 +96,13 @@ export function ladeEinstellungen() {
   const modell = anbieter.modelle.some((m) => m.id === daten.modelle[anbieter.id])
     ? daten.modelle[anbieter.id]
     : anbieter.modelle[0].id;
-  return { ...daten, anbieter: anbieter.id, apiSchluessel: daten.schluessel[anbieter.id] ?? '', modell };
+  return {
+    ...daten,
+    anbieter: anbieter.id,
+    apiSchluessel: daten.schluessel[anbieter.id] ?? '',
+    modell,
+    groqSchluessel: daten.schluessel.groq ?? '', // auch für Whisper, wenn ein anderer Anbieter gewählt ist
+  };
 }
 
 /**
@@ -87,9 +111,10 @@ export function ladeEinstellungen() {
  */
 export function speichereEinstellungen(aenderungen) {
   const daten = liesGespeichert();
-  const { apiSchluessel, modell, ...rest } = aenderungen;
+  const { apiSchluessel, modell, groqSchluessel, ...rest } = aenderungen;
   const anbieterWechsel = rest.anbieter && rest.anbieter !== daten.anbieter;
   Object.assign(daten, rest);
+  if (groqSchluessel !== undefined) daten.schluessel.groq = groqSchluessel.trim();
   if (!anbieterWechsel) {
     if (apiSchluessel !== undefined) daten.schluessel[daten.anbieter] = apiSchluessel.trim();
     if (modell !== undefined) daten.modelle[daten.anbieter] = modell;

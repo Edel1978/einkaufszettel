@@ -528,6 +528,47 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   border-radius: var(--radius);
 }
 
+/* ---------- Diktieren ---------- */
+.mikro-kreis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--primaer);
+  color: var(--primaer-text);
+  animation: pulsieren 1.6s ease-in-out infinite;
+}
+.mikro-kreis svg {
+  width: 44px;
+  height: 44px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+@keyframes pulsieren {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.45); }
+  50% { box-shadow: 0 0 0 18px rgba(46, 125, 50, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .mikro-kreis { animation: none; } }
+
+.diktat-text {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 4px solid var(--primaer);
+  border-radius: 8px;
+  background: var(--flaeche);
+  font-style: italic;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.diktat-text.live { min-height: 72px; }
+.aufnahme-uhr { margin: 0; font-size: 2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.foto-kopf.spalte { flex-direction: column; align-items: stretch; gap: 8px; }
+
 /* ---------- Offline & Installation ---------- */
 .offline-leiste {
   position: sticky;
