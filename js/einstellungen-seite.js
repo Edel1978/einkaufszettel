@@ -2,9 +2,10 @@
 // Spracheingabe und App-Optionen. Änderungen werden sofort gespeichert.
 
 import {
-  BETRIEBSARTEN, ANBIETER, SPRACHEINGABEN, anbieterInfo, ladeEinstellungen, speichereEinstellungen,
-  einstellungenFuer,
+  BETRIEBSARTEN, ANBIETER, SPRACHEINGABEN, DARSTELLUNGEN, anbieterInfo, ladeEinstellungen,
+  speichereEinstellungen, einstellungenFuer,
 } from './einstellungen.js';
+import { wendeDarstellungAn } from './darstellung.js';
 import { browserErkennungVerfuegbar, aufnahmeVerfuegbar } from './sprache.js';
 import { testeVerbindung, dienstName } from './recognizers/index.js';
 import { kannInstallieren, istInstalliert, installiere } from './installieren.js';
@@ -109,6 +110,15 @@ export function zeigeEinstellungen(app) {
 
       <section class="block">
         <h2>App</h2>
+        <div class="feld"><span>Darstellung</span>
+          <div class="segmente" role="radiogroup" aria-label="Darstellung">
+            ${DARSTELLUNGEN.map((d) => `
+              <label class="segment" title="${esc(d.info)}">
+                <input type="radio" name="darstellung" value="${d.id}"${d.id === e.darstellung ? ' checked' : ''}>
+                <span>${esc(d.name)}</span>
+              </label>`).join('')}
+          </div>
+        </div>
         <label class="option">
           <input type="checkbox" name="bildschirmAn"${e.bildschirmAn ? ' checked' : ''}>
           <span><strong>Bildschirm beim Einkaufen anlassen</strong>
@@ -145,6 +155,7 @@ export function zeigeEinstellungen(app) {
     const vorher = ladeEinstellungen();
     speichereEinstellungen(liesFormular());
     const jetzt = ladeEinstellungen();
+    wendeDarstellungAn(jetzt.darstellung);
     // Andere Dienste oder Spracheingabe gewählt: Seite mit den passenden Feldern neu aufbauen.
     if (['anbieter', 'ausweichAnbieter', 'betriebsart', 'spracheingabe'].some((k) => vorher[k] !== jetzt[k])) {
       zeigeEinstellungen(app);

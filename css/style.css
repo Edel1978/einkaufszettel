@@ -28,8 +28,10 @@
   --schnell: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Dunkel: automatisch nach Handy-Einstellung – außer in der App ist „Hell“ gewählt –
+   oder fest, wenn in der App „Dunkel“ gewählt ist (data-darstellung am <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-darstellung="hell"]) {
     --hintergrund: #0f1411;
     --flaeche: #19211c;
     --flaeche-2: #212b25;
@@ -46,8 +48,29 @@
     --gefahr: #ff6b6b;
     --schatten-1: 0 1px 2px rgba(0, 0, 0, 0.3);
     --schatten-2: 0 12px 32px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
   }
 }
+:root[data-darstellung="dunkel"] {
+  --hintergrund: #0f1411;
+  --flaeche: #19211c;
+  --flaeche-2: #212b25;
+  --text: #e8efea;
+  --text-leise: #9ba89f;
+  --linie: #2a352e;
+  --primaer: #4cc37a;
+  --primaer-stark: #3ba866;
+  --primaer-text: #06240f;
+  --primaer-hell: #1b3424;
+  --primaer-ring: rgba(76, 195, 122, 0.35);
+  --warn: #ffb74d;
+  --warn-hell: #3a2c18;
+  --gefahr: #ff6b6b;
+  --schatten-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --schatten-2: 0 12px 32px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+:root[data-darstellung="hell"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 
@@ -775,6 +798,29 @@ dialog::backdrop { background: rgba(10, 20, 14, 0.45); animation: abdunkeln 260m
 .option span { display: grid; gap: 2px; }
 .option small { color: var(--text-leise); font-size: 0.85rem; }
 .passwort-feld { display: flex; gap: 8px; }
+
+/* Umschalter mit mehreren Feldern (z. B. Automatisch | Hell | Dunkel) */
+.segmente {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--flaeche-2);
+}
+.segment { flex: 1; position: relative; cursor: pointer; }
+.segment input { position: absolute; opacity: 0; pointer-events: none; }
+.segment span {
+  display: block;
+  padding: 10px 6px;
+  border-radius: 999px;
+  color: var(--text-leise);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: center;
+  transition: background var(--schnell), color var(--schnell), box-shadow var(--schnell);
+}
+.segment input:checked + span { background: var(--flaeche); color: var(--primaer); box-shadow: var(--schatten-1); }
+.segment input:focus-visible + span { outline: 3px solid var(--primaer-ring); }
 .passwort-feld .btn { flex-shrink: 0; padding: 0 14px; }
 .test-ergebnis { display: grid; gap: 6px; margin: 0; padding: 12px 14px; border-radius: var(--radius-klein); background: var(--flaeche-2); }
 .test-ergebnis p { margin: 0; }

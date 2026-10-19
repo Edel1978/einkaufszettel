@@ -6,6 +6,13 @@
   <meta name="theme-color" content="#f3f6f2" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0f1411" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
+  <script>
+    // Hell/Dunkel aus den Einstellungen sofort setzen, damit beim Start nichts aufblitzt.
+    try {
+      var d = JSON.parse(localStorage.getItem('einkaufszettel.einstellungen.v1') || '{}').darstellung;
+      if (d === 'hell' || d === 'dunkel') document.documentElement.dataset.darstellung = d;
+    } catch (e) { /* ohne gespeicherte Einstellung: automatisch */ }
+  </script>
   <title>Einkaufszettel</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">

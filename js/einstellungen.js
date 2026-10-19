@@ -60,6 +60,13 @@ export const SPRACHEINGABEN = [
   { id: 'groq', name: 'Groq Whisper', info: 'Sehr genau, auch bei Produktnamen. Braucht einen kostenlosen Groq-Schlüssel.' },
 ];
 
+/** Hell/Dunkel-Auswahl. */
+export const DARSTELLUNGEN = [
+  { id: 'auto', name: 'Automatisch', info: 'Wie am Handy eingestellt' },
+  { id: 'hell', name: 'Hell', info: 'Immer helle Farben' },
+  { id: 'dunkel', name: 'Dunkel', info: 'Immer dunkle Farben' },
+];
+
 const STANDARD = {
   betriebsart: 'direkt',
   anbieter: 'google', // erster Dienst
@@ -70,6 +77,7 @@ const STANDARD = {
   serverPasswort: '',
   bildschirmAn: true, // Bildschirm in der Einkaufsliste nicht ausgehen lassen
   spracheingabe: 'browser',
+  darstellung: 'auto', // 'auto' (wie das Handy), 'hell' oder 'dunkel'
 };
 
 export function anbieterInfo(id) {

@@ -16,6 +16,7 @@ import { initFoto, waehleFoto, starteDiktat, zeigeFoto, verlasseFoto, offenerVor
 import { zeigeEinstellungen } from './einstellungen-seite.js';
 import { ladeEinstellungen } from './einstellungen.js';
 import { halteBildschirmAn } from './wachhalten.js';
+import { wendeDarstellungAn } from './darstellung.js';
 import {
   registriereServiceWorker, kannInstallieren, installiere, beiInstallierbarkeit,
   installHinweisAusgeblendet, blendeInstallHinweisAus,
@@ -47,6 +48,7 @@ const app = {
 // ---------- Start & Navigation ----------
 
 async function start() {
+  wendeDarstellungAn(ladeEinstellungen().darstellung);
   listen = await speicher.ladeAlle();
   // Nach einer Änderung der Kategorien vorhandene Einträge umstellen.
   for (const liste of listen) {

@@ -6,7 +6,7 @@
 // - Auf dem PC (localhost): immer zuerst aus dem Netz, damit Änderungen sofort sichtbar sind.
 // Anfragen an andere Server (z. B. die KI-Dienste) werden nie zwischengespeichert.
 
-const CACHE = 'einkaufszettel-v3';
+const CACHE = 'einkaufszettel-v4';
 
 const APP_DATEIEN = [
   './',
@@ -27,6 +27,7 @@ const APP_DATEIEN = [
   'js/listen.js',
   'js/util.js',
   'js/wachhalten.js',
+  'js/darstellung.js',
   'js/installieren.js',
   'js/sprache.js',
   'js/recognizers/index.js',
