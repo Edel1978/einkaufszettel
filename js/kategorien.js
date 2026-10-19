@@ -4,18 +4,18 @@
 // Änderungen sind jederzeit möglich: Für umbenannte oder zusammengelegte Kategorien
 // einen Eintrag in UMZUG ergänzen – vorhandene Listen werden beim Start automatisch umgestellt.
 
-// "beispiele" helfen der KI bei der Zuordnung.
+// "symbol" erscheint in der Liste, "beispiele" helfen der KI bei der Zuordnung.
 export const KATEGORIEN = [
-  { id: 'obst-gemuese', name: 'Obst & Gemüse', beispiele: 'frisches Obst, Gemüse, Salat, Kräuter' },
-  { id: 'brot', name: 'Brot & Backwaren', beispiele: 'Brot, Brötchen, Toast, Kuchen, Teilchen' },
-  { id: 'fleisch-wurst', name: 'Fleisch, Wurst & Aufschnitt', beispiele: 'Fleisch, Geflügel, Wurst, Schinken, Aufschnitt, Fisch' },
-  { id: 'milch-kuehl', name: 'Milch, Käse & Kühlregal', beispiele: 'Milch, Sahne, Joghurt, Pudding, Käse, Butter, Eier, Frischkäse' },
-  { id: 'tiefkuehl', name: 'Tiefkühl', beispiele: 'Tiefkühlkost, Eis, Pommes, TK-Pizza' },
-  { id: 'vorrat', name: 'Vorrat, Suppen & Kaffee', beispiele: 'Nudeln, Reis, Mehl, Zucker, Salz, Gewürze, Konserven, Fertigsuppen, Marmelade, Süßes, Kaffee, Tee' },
-  { id: 'getraenke', name: 'Getränke', beispiele: 'Wasser, Saft, Limonade, Bier, Wein' },
-  { id: 'pflege', name: 'Pflegeprodukte', beispiele: 'Zahnpasta, Duschgel, Shampoo, Deo, Kosmetik' },
-  { id: 'haushalt', name: 'Haushalt', beispiele: 'Toilettenpapier, Küchentücher, Müllbeutel, Putz- und Spülmittel' },
-  { id: 'sonstiges', name: 'Sonstiges', beispiele: 'alles andere' },
+  { id: 'obst-gemuese', symbol: '🥦', name: 'Obst & Gemüse', beispiele: 'frisches Obst, Gemüse, Salat, Kräuter' },
+  { id: 'brot', symbol: '🥖', name: 'Brot & Backwaren', beispiele: 'Brot, Brötchen, Toast, Kuchen, Teilchen' },
+  { id: 'fleisch-wurst', symbol: '🥩', name: 'Fleisch, Wurst & Aufschnitt', beispiele: 'Fleisch, Geflügel, Wurst, Schinken, Aufschnitt, Fisch' },
+  { id: 'milch-kuehl', symbol: '🧀', name: 'Milch, Käse & Kühlregal', beispiele: 'Milch, Sahne, Joghurt, Pudding, Käse, Butter, Eier, Frischkäse' },
+  { id: 'tiefkuehl', symbol: '🧊', name: 'Tiefkühl', beispiele: 'Tiefkühlkost, Eis, Pommes, TK-Pizza' },
+  { id: 'vorrat', symbol: '🥫', name: 'Vorrat, Suppen & Kaffee', beispiele: 'Nudeln, Reis, Mehl, Zucker, Salz, Gewürze, Konserven, Fertigsuppen, Marmelade, Süßes, Kaffee, Tee' },
+  { id: 'getraenke', symbol: '🥤', name: 'Getränke', beispiele: 'Wasser, Saft, Limonade, Bier, Wein' },
+  { id: 'pflege', symbol: '🧴', name: 'Pflegeprodukte', beispiele: 'Zahnpasta, Duschgel, Shampoo, Deo, Kosmetik' },
+  { id: 'haushalt', symbol: '🧻', name: 'Haushalt', beispiele: 'Toilettenpapier, Küchentücher, Müllbeutel, Putz- und Spülmittel' },
+  { id: 'sonstiges', symbol: '🛒', name: 'Sonstiges', beispiele: 'alles andere' },
 ];
 
 export const STANDARD_KATEGORIE = 'sonstiges';
@@ -36,6 +36,10 @@ const UMZUG = {
 export function aktuelleKategorie(id) {
   if (KATEGORIEN.some((k) => k.id === id)) return id;
   return UMZUG[id] ?? STANDARD_KATEGORIE;
+}
+
+export function kategorieSymbol(id) {
+  return KATEGORIEN.find((k) => k.id === id)?.symbol ?? '🛒';
 }
 
 export function kategorieName(id) {

@@ -9,7 +9,7 @@ import {
   aendereMenge, mengenSchritt, entferneErledigte, setzeHaekchenZurueck, gruppiere, fortschritt,
   ziehKategorienUm,
 } from './listen.js';
-import { EINHEITEN, KATEGORIEN, kategorieName, rateKategorie, merkeKategorie } from './kategorien.js';
+import { EINHEITEN, KATEGORIEN, kategorieName, kategorieSymbol, kategorieRang, rateKategorie, merkeKategorie } from './kategorien.js';
 import { esc, formatZahl, leseZahl } from './util.js';
 import { eingabe, bestaetige, menue, formular, meldung } from './dialoge.js';
 import { initFoto, waehleFoto, starteDiktat, zeigeFoto, verlasseFoto, offenerVorgang } from './foto.js';
@@ -26,6 +26,9 @@ const MIKRO_ICON = '<svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"
 
 const inhalt = document.getElementById('inhalt');
 const titel = document.getElementById('titel');
+const untertitel = document.getElementById('untertitel');
+const kopf = document.querySelector('.kopf');
+const kopfBalken = document.getElementById('kopf-balken');
 const zurueckKnopf = document.getElementById('zurueck');
 const menueKnopf = document.getElementById('kopf-menue');
 const einstellungenKnopf = document.getElementById('kopf-einstellungen');
@@ -69,10 +72,21 @@ async function start() {
   zeige();
 }
 
-/** Kopfzeile einstellen und alte Ereignis-Handler des Inhalts entfernen. */
-function setzeKopf({ titel: text, zurueck = false, listenMenue = null, einstellungen = false }) {
+/**
+ * Kopfzeile einstellen und alte Ereignis-Handler des Inhalts entfernen.
+ * untertitel: kleine Zeile unter dem Titel; fortschritt: 0…1 für den Balken; gross: großer Titel (Übersicht).
+ */
+function setzeKopf({
+  titel: text, untertitel: unter = '', fortschritt: anteil = null, gross = false,
+  zurueck = false, listenMenue = null, einstellungen = false,
+}) {
   document.title = text === 'Einkaufszettel' ? text : `${text} – Einkaufszettel`;
   titel.textContent = text;
+  untertitel.textContent = unter;
+  untertitel.hidden = !unter;
+  kopf.classList.toggle('gross', gross);
+  kopfBalken.hidden = anteil === null;
+  if (anteil !== null) kopfBalken.firstElementChild.style.width = `${Math.round(anteil * 100)}%`;
   zurueckKnopf.hidden = !zurueck;
   menueKnopf.hidden = !listenMenue;
   menueKnopf.onclick = listenMenue;
@@ -134,8 +148,15 @@ function offenerVorgangHtml() {
     </a>` : '';
 }
 
+/** Symbole der Kategorien, die in einer Liste vorkommen (Supermarkt-Reihenfolge, höchstens 6). */
+function listenSymbole(liste) {
+  const kategorien = [...new Set(liste.eintraege.map((e) => e.kategorie))];
+  return kategorien.sort((a, b) => kategorieRang(a) - kategorieRang(b)).slice(0, 6).map(kategorieSymbol).join(' ');
+}
+
 function zeigeUebersicht() {
-  setzeKopf({ titel: 'Einkaufszettel', einstellungen: true });
+  const heute = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  setzeKopf({ titel: 'Einkaufszettel', untertitel: heute, gross: true, einstellungen: true });
 
   const sortiert = [...listen].sort((a, b) => b.erstelltAm.localeCompare(a.erstelltAm));
 
@@ -144,19 +165,23 @@ function zeigeUebersicht() {
     ${offenerVorgangHtml()}
     ${sortiert.length === 0 ? `
       <div class="leer">
+        <div class="leer-symbol" aria-hidden="true">🛒</div>
         <p class="leer-titel">Noch keine Listen</p>
         <p>Fotografiere deinen Einkaufszettel, sprich deine Liste ein oder lege sie von Hand an.</p>
       </div>` : `
       <ul class="karten">
         ${sortiert.map((l) => {
           const { gesamt, erledigt } = fortschritt(l);
-          const info = gesamt === 0 ? 'Leer' : `${erledigt} / ${gesamt} erledigt`;
           const fertig = gesamt > 0 && erledigt === gesamt;
+          const info = gesamt === 0 ? 'Noch leer'
+            : fertig ? '✓ Alles erledigt'
+              : `${gesamt} Artikel · ${erledigt} erledigt`;
           return `
             <li class="karte${fertig ? ' fertig' : ''}">
               <a class="karte-link" href="#/liste/${encodeURIComponent(l.id)}">
                 <span class="karte-name">${esc(l.name)}</span>
                 <span class="karte-info">${info}</span>
+                ${gesamt > 0 ? `<span class="karte-symbole" aria-hidden="true">${listenSymbole(l)}</span>` : ''}
                 ${gesamt > 0 ? `<span class="balken"><span style="width:${(erledigt / gesamt) * 100}%"></span></span>` : ''}
               </a>
               <button class="icon-btn" type="button" data-menue="${esc(l.id)}" aria-label="Menü für ${esc(l.name)}">
@@ -167,7 +192,7 @@ function zeigeUebersicht() {
       </ul>`}
     <div class="aktionsleiste">
       <button id="neue-liste" class="btn" type="button">+ Liste</button>
-      <button id="diktieren" class="btn btn-primaer" type="button">
+      <button id="diktieren" class="btn btn-tonal" type="button">
         ${MIKRO_ICON}
         Sprechen</button>
       <button id="foto-einlesen" class="btn btn-primaer" type="button">
@@ -265,18 +290,23 @@ async function listenMenue(liste) {
 // ---------- Einzelne Liste ----------
 
 function zeigeListe(liste) {
-  setzeKopf({ titel: liste.name, zurueck: true, listenMenue: () => listenMenue(liste) });
-
   const { gesamt, erledigt } = fortschritt(liste);
+  setzeKopf({
+    titel: liste.name,
+    untertitel: gesamt === 0 ? 'Noch leer' : erledigt === gesamt ? 'Alles erledigt 🎉' : `${erledigt} von ${gesamt} erledigt`,
+    fortschritt: gesamt === 0 ? null : erledigt / gesamt,
+    zurueck: true,
+    listenMenue: () => listenMenue(liste),
+  });
 
   inhalt.innerHTML = `
     <form id="eingabe" class="eingabe" autocomplete="off">
       <div class="eingabe-zeile">
         <input name="name" class="eingabe-name" type="text" placeholder="Artikel, z. B. Milch" aria-label="Artikel" required>
-        <button class="btn foto-knopf" type="button" data-diktat aria-label="Artikel diktieren und hinzufügen">
+        <button class="btn btn-tonal foto-knopf" type="button" data-diktat aria-label="Artikel diktieren und hinzufügen">
           ${MIKRO_ICON}
         </button>
-        <button class="btn foto-knopf" type="button" data-foto aria-label="Zettel fotografieren und hinzufügen">
+        <button class="btn btn-tonal foto-knopf" type="button" data-foto aria-label="Zettel fotografieren und hinzufügen">
           ${KAMERA_ICON}
         </button>
       </div>
@@ -290,16 +320,17 @@ function zeigeListe(liste) {
 
     ${gesamt === 0 ? `
       <div class="leer">
+        <div class="leer-symbol" aria-hidden="true">📝</div>
         <p class="leer-titel">Die Liste ist leer</p>
-        <p>Füge oben Artikel hinzu.</p>
+        <p>Tippe oben einen Artikel ein, sprich ihn ein oder fotografiere deinen Zettel.</p>
       </div>` : `
-      <div class="fortschritt">
-        <span>${erledigt === gesamt ? 'Alles erledigt' : `${erledigt} von ${gesamt} erledigt`}</span>
-        <span class="balken"><span style="width:${(erledigt / gesamt) * 100}%"></span></span>
-      </div>
       ${gruppiere(liste).map((g) => `
         <section class="gruppe${g.fertig ? ' fertig' : ''}">
-          <h2 class="gruppe-titel">${esc(kategorieName(g.kategorie))}</h2>
+          <h2 class="gruppe-titel">
+            <span class="gruppe-symbol" aria-hidden="true">${kategorieSymbol(g.kategorie)}</span>
+            <span class="gruppe-name">${esc(kategorieName(g.kategorie))}</span>
+            <span class="gruppe-zahl">${g.eintraege.filter((e) => e.erledigt).length}/${g.eintraege.length}</span>
+          </h2>
           <ul class="eintraege">${g.eintraege.map(eintragHtml).join('')}</ul>
         </section>`).join('')}
     `}
@@ -336,6 +367,7 @@ function zeigeListe(liste) {
     if (aktion === 'umschalten') {
       const eintrag = schalteErledigt(liste, id);
       if (eintrag?.erledigt) navigator.vibrate?.(15);
+      zuletztUmgeschaltet = id; // nur dieser Eintrag bekommt die Häkchen-Animation
     } else if (aktion === 'mehr' || aktion === 'weniger') {
       aendereMenge(liste, id, aktion === 'mehr' ? 1 : -1);
     } else if (aktion === 'bearbeiten') {
@@ -344,6 +376,7 @@ function zeigeListe(liste) {
     }
     await sichere(liste);
     zeigeListe(liste);
+    zuletztUmgeschaltet = null;
   };
 }
 
@@ -351,11 +384,14 @@ function mengenText(e) {
   return [formatZahl(e.menge), e.einheit].filter(Boolean).join(' ');
 }
 
+let zuletztUmgeschaltet = null;
+
 function eintragHtml(e) {
   const menge = mengenText(e);
   const minusAus = e.menge == null || e.menge <= mengenSchritt(e.einheit);
+  const frisch = e.id === zuletztUmgeschaltet ? ' frisch' : '';
   return `
-    <li class="eintrag${e.erledigt ? ' erledigt' : ''}" data-id="${esc(e.id)}">
+    <li class="eintrag${e.erledigt ? ' erledigt' : ''}${frisch}" data-id="${esc(e.id)}">
       <button class="eintrag-haupt" type="button" role="checkbox" aria-checked="${e.erledigt}" data-aktion="umschalten">
         <span class="haken" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
         <span class="eintrag-name">${esc(e.name)}</span>

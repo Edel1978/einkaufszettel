@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#2e7d32">
+  <meta name="theme-color" content="#f3f6f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1411" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
   <title>Einkaufszettel</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -17,13 +18,17 @@
     <button id="zurueck" class="icon-btn" type="button" aria-label="Zurück zur Übersicht" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
     </button>
-    <h1 id="titel">Einkaufszettel</h1>
+    <div class="kopf-text">
+      <h1 id="titel">Einkaufszettel</h1>
+      <p id="untertitel" class="kopf-untertitel" hidden></p>
+    </div>
     <button id="kopf-menue" class="icon-btn" type="button" aria-label="Listen-Menü" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
     </button>
     <a id="kopf-einstellungen" class="icon-btn" href="#/einstellungen" aria-label="Einstellungen" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.6-2-3.4-2.4 1a7.5 7.5 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A7.5 7.5 0 0 0 7 6.5l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 3l-2 1.6 2 3.4 2.4-1a7.5 7.5 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.5 7.5 0 0 0 2.6-1.5l2.4 1 2-3.4z"/></svg>
     </a>
+    <div id="kopf-balken" class="kopf-balken" hidden><span></span></div>
   </header>
   <div id="offline" class="offline-leiste" role="status" hidden>Offline – deine Listen funktionieren, Fotos einlesen erst wieder mit Internet.</div>
 

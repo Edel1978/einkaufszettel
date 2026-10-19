@@ -386,7 +386,7 @@ function pruefHtml(v) {
         ? '<button class="btn" type="button" data-aktion="neu-sprechen">Neu sprechen</button>'
         : '<button class="btn" type="button" data-aktion="anderes-foto">Neues Foto</button>'}
       <button class="btn btn-primaer" type="button" data-aktion="uebernehmen"${anzahl === 0 ? ' disabled' : ''}>
-        ${anzahl} Artikel übernehmen</button>
+        Übernehmen (${anzahl})</button>
     </div>`;
 }
 
@@ -471,7 +471,7 @@ function aktualisiereUebernehmenKnopf() {
   const knopf = app.inhalt.querySelector('[data-aktion="uebernehmen"]');
   const anzahl = vorgang.eintraege.filter((e) => e.uebernehmen).length;
   knopf.disabled = anzahl === 0;
-  knopf.textContent = `${anzahl} Artikel übernehmen`;
+  knopf.textContent = `Übernehmen (${anzahl})`;
 }
 
 async function beiKlick(ev) {
