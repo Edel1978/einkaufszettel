@@ -10,7 +10,7 @@
 // Update nicht versehentlich alte Dateien aus diesem Zwischenspeicher übernimmt, wird hier immer
 // am Server nachgefragt (cache: 'reload' bzw. 'no-cache').
 
-const CACHE = 'einkaufszettel-v9';
+const CACHE = 'einkaufszettel-v10';
 
 const APP_DATEIEN = [
   './',
@@ -18,6 +18,7 @@ const APP_DATEIEN = [
   'manifest.webmanifest',
   'css/style.css',
   'icons/icon.svg',
+  'icons/logo.svg',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',

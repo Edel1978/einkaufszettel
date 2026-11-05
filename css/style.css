@@ -131,6 +131,18 @@ button, input, select { font: inherit; color: inherit; }
 .kopf.gross { padding-top: calc(env(safe-area-inset-top) + 10px); }
 .kopf.gross .kopf-text { padding: 6px 10px 10px; }
 .kopf.gross h1 { font-size: 1.85rem; letter-spacing: -0.02em; }
+
+/* RH-Logo als Maske → nimmt die Textfarbe an (hell/dunkel); nur auf der Übersicht */
+.marke { display: none; }
+.kopf.gross .marke {
+  display: block;
+  width: 62px;
+  height: 30px;
+  margin-bottom: 6px;
+  background: currentColor;
+  -webkit-mask: url(../icons/logo.svg) left center / contain no-repeat;
+  mask: url(../icons/logo.svg) left center / contain no-repeat;
+}
 .kopf.gross .kopf-untertitel { font-size: 0.95rem; }
 
 /* Fortschritt einer Liste direkt unter der Kopfzeile */
