@@ -14,8 +14,28 @@ function ladeAlsBild(datei) {
   });
 }
 
+// Vier überlappende Viertel in voller Auflösung. Im Test (05.11.2026) übersah die KI auf der
+// ganzen Seite einer Ankreuzliste regelmäßig Kästchen; mit den Ausschnitten dazu las sie alles richtig.
+const UEBERLAPPUNG = 0.06;
+
+function zeichne(quelle, sx, sy, sw, sh) {
+  const faktor = Math.min(1, MAX_KANTE / Math.max(sw, sh));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(sw * faktor);
+  canvas.height = Math.round(sh * faktor);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; // transparente Bereiche (z. B. PNG) weiß statt schwarz
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(quelle, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+function base64(canvas) {
+  return canvas.toDataURL('image/jpeg', QUALITAET).split(',')[1];
+}
+
 /**
- * Liefert { dataUrl, base64, mediaType, breite, hoehe }.
+ * Liefert { dataUrl, base64, mediaType, breite, hoehe, kacheln: [{ name, base64 }] }.
  * Wirft einen Fehler, wenn die Datei kein lesbares Bild ist.
  */
 export async function bereiteBildVor(datei) {
@@ -31,19 +51,15 @@ export async function bereiteBildVor(datei) {
     quelle = await ladeAlsBild(datei);
   }
 
-  const faktor = Math.min(1, MAX_KANTE / Math.max(quelle.width, quelle.height));
-  const breite = Math.round(quelle.width * faktor);
-  const hoehe = Math.round(quelle.height * faktor);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = breite;
-  canvas.height = hoehe;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff'; // transparente Bereiche (z. B. PNG) weiß statt schwarz
-  ctx.fillRect(0, 0, breite, hoehe);
-  ctx.drawImage(quelle, 0, 0, breite, hoehe);
+  const { width: w, height: h } = quelle;
+  const canvas = zeichne(quelle, 0, 0, w, h);
+  const kw = w * (0.5 + UEBERLAPPUNG);
+  const kh = h * (0.5 + UEBERLAPPUNG);
+  const kacheln = [
+    ['oben links', 0, 0], ['oben rechts', w - kw, 0], ['unten links', 0, h - kh], ['unten rechts', w - kw, h - kh],
+  ].map(([name, x, y]) => ({ name, base64: base64(zeichne(quelle, x, y, kw, kh)) }));
   quelle.close?.();
 
   const dataUrl = canvas.toDataURL('image/jpeg', QUALITAET);
-  return { dataUrl, base64: dataUrl.split(',')[1], mediaType: 'image/jpeg', breite, hoehe };
+  return { dataUrl, base64: dataUrl.split(',')[1], mediaType: 'image/jpeg', breite: canvas.width, hoehe: canvas.height, kacheln };
 }

@@ -100,6 +100,26 @@ Diese Artikel hat der Nutzer schon früher eingekauft (häufigste zuerst). Ähne
 ${bekannteArtikel.join(', ')}`;
 }
 
+/**
+ * Bilder und Begleittexte für eine Foto-Anfrage, in dieser Reihenfolge:
+ * ganze Seite, dann die vergrößerten Viertel, dann die Aufgabe.
+ * Liefert [{ text } | { base64, mediaType }]; jeder Dienst baut daraus sein eigenes Format.
+ */
+export function fotoTeile(bild) {
+  const kacheln = bild.kacheln ?? [];
+  const teile = [{ text: 'Bild 1: die ganze Seite.' }, { base64: bild.base64, mediaType: bild.mediaType }];
+  kacheln.forEach((k, i) => {
+    teile.push({ text: `Bild ${i + 2}: vergrößerter Ausschnitt ${k.name} derselben Seite (überlappt mit den Nachbarn).` });
+    teile.push({ base64: k.base64, mediaType: bild.mediaType });
+  });
+  teile.push({
+    text: kacheln.length
+      ? 'Lies diese Seite (freier Zettel oder Ankreuzliste). Die Ausschnitte zeigen dieselbe Seite vergrößert – nutze sie, um jedes Kästchen und jedes Wort genau zu prüfen. Jeden Artikel nur einmal aufführen, auch wenn er auf mehreren Bildern zu sehen ist.'
+      : 'Lies diesen Einkaufszettel (freier Zettel oder Ankreuzliste).',
+  });
+  return teile;
+}
+
 /** Text, mit dem der diktierte Inhalt an die KI geht. */
 export function textNachricht(text) {
   return `Diktierte Einkaufsliste:\n"""\n${text}\n"""`;

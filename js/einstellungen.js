@@ -24,8 +24,11 @@ export const ANBIETER = [
     // "denken": wie lange das Modell nachdenkt. Ablesen braucht wenig – im Test (12.10.2026)
     // war 3.8 Flash mit "low" 12 s statt 95 s schnell, bei gleich gutem Ergebnis.
     // (gemini-2.5-flash ist für neue Konten nicht mehr verfügbar.)
+    // 3.5 Flash las im Test vom 05.11.2026 die Ankreuzliste fehlerfrei in 5–9 s, während 3.8 Flash überlastet war.
+    // "ersatz": bei Überlastung (503) einmal mit diesem Modell versuchen.
     modelle: [
-      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash – kostenlos, genau (ca. 10 s)', denken: 'low' },
+      { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash – kostenlos, genau (ca. 10 s, empfohlen)', denken: 'low', ersatz: 'gemini-3.8-flash' },
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash – kostenlos, neuestes Modell (oft überlastet)', denken: 'low', ersatz: 'gemini-3.5-flash' },
       { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite – kostenlos, etwas schneller', denken: 'minimal' },
     ],
   },

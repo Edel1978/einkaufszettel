@@ -4,7 +4,7 @@
 // Der API-Schlüssel kommt aus den Einstellungen und wird nur an api.groq.com gesendet.
 
 import {
-  anweisungMit, textNachricht, ANTWORT_SCHEMA, ErkennungsFehler, werteAntwortAus,
+  anweisungMit, textNachricht, fotoTeile, ANTWORT_SCHEMA, ErkennungsFehler, werteAntwortAus,
   fehlerAusAntwort, sicherFetch, fehlerNachricht,
 } from './gemeinsam.js';
 import { anbieterInfo } from '../einstellungen.js';
@@ -74,10 +74,10 @@ export function erkenne(bild, einstellungen, signal, kontext = {}) {
     { role: 'system', content: anweisungMit(kontext.bekannteArtikel) },
     {
       role: 'user',
-      content: [
-        { type: 'text', text: 'Lies diesen Einkaufszettel (freier Zettel oder Ankreuzliste).' },
-        { type: 'image_url', image_url: { url: `data:${bild.mediaType};base64,${bild.base64}` } },
-      ],
+      // Groq erlaubt höchstens 5 Bilder pro Anfrage – ganze Seite + 4 Viertel passt genau.
+      content: fotoTeile(bild).map((t) => (t.text
+        ? { type: 'text', text: t.text }
+        : { type: 'image_url', image_url: { url: `data:${t.mediaType};base64,${t.base64}` } })),
     },
   ], signal);
 }

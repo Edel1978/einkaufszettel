@@ -2,7 +2,7 @@
 // Der API-Schlüssel kommt aus den Einstellungen und wird nur an api.anthropic.com gesendet.
 
 import {
-  anweisungMit, textNachricht, ANTWORT_SCHEMA, ErkennungsFehler, werteAntwortAus,
+  anweisungMit, textNachricht, fotoTeile, ANTWORT_SCHEMA, ErkennungsFehler, werteAntwortAus,
   fehlerAusAntwort, sicherFetch, fehlerNachricht,
 } from './gemeinsam.js';
 
@@ -39,10 +39,9 @@ async function sendeAnfrage(schluessel, anfrage, mitAusweichModell, signal) {
 }
 
 export function erkenne(bild, einstellungen, signal, kontext = {}) {
-  return frage(einstellungen, anweisungMit(kontext.bekannteArtikel), [
-    { type: 'image', source: { type: 'base64', media_type: bild.mediaType, data: bild.base64 } },
-    { type: 'text', text: 'Lies diesen Einkaufszettel (freier Zettel oder Ankreuzliste).' },
-  ], signal);
+  return frage(einstellungen, anweisungMit(kontext.bekannteArtikel), fotoTeile(bild).map((t) => (t.text
+    ? { type: 'text', text: t.text }
+    : { type: 'image', source: { type: 'base64', media_type: t.mediaType, data: t.base64 } })), signal);
 }
 
 export function erkenneText(text, einstellungen, signal, kontext = {}) {

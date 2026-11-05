@@ -233,9 +233,15 @@ async function erkenneJetzt() {
     if (vorgang !== v) return;
     const listen = app.listen();
     // Weitere Seite einer Ankreuzliste: automatisch in die Liste mit derselben Kennung.
+    // Mittlere Seiten tragen keine Kennung: Hat das Foto angekreuzte Codes, gehört es zur zuletzt
+    // bearbeiteten Ankreuzliste der letzten 12 Stunden.
+    const neuesteZuerst = [...listen].sort((a, b) => b.geaendertAm.localeCompare(a.geaendertAm));
+    const mitCodes = ergebnis.eintraege.some((e) => e.code);
+    const grenze = new Date(Date.now() - 12 * 3600 * 1000).toISOString();
     const passend = ergebnis.kennung
-      ? [...listen].sort((a, b) => b.erstelltAm.localeCompare(a.erstelltAm)).find((l) => l.kennung === ergebnis.kennung)
-      : null;
+      ? neuesteZuerst.find((l) => l.kennung === ergebnis.kennung)
+      : mitCodes ? neuesteZuerst.find((l) => l.kennung && l.geaendertAm >= grenze) : null;
+    if (!ergebnis.kennung && passend) ergebnis.kennung = passend.kennung;
     const ziel = listen.some((l) => l.id === v.zielListeId) ? v.zielListeId : passend?.id ?? 'neu';
     Object.assign(v, {
       status: 'pruefen',

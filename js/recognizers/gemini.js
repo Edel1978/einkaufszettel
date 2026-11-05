@@ -3,7 +3,7 @@
 // Der API-Schlüssel kommt aus den Einstellungen und wird nur an generativelanguage.googleapis.com gesendet.
 
 import {
-  anweisungMit, textNachricht, SICHERHEITEN, QUELLEN, ZUSTAENDE, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
+  anweisungMit, textNachricht, fotoTeile, SICHERHEITEN, QUELLEN, ZUSTAENDE, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
 } from './gemeinsam.js';
 import { KATEGORIEN } from '../kategorien.js';
 import { anbieterInfo } from '../einstellungen.js';
@@ -74,18 +74,15 @@ function geminiFehler(status, nachricht) {
 }
 
 export function erkenne(bild, einstellungen, signal, kontext = {}) {
-  // Fotos (vor allem Ankreuzlisten mit vielen Kästchen) brauchen etwas mehr Sorgfalt als Diktate.
-  return frage(einstellungen, anweisungMit(kontext.bekannteArtikel), [
-    { inline_data: { mime_type: bild.mediaType, data: bild.base64 } },
-    { text: 'Lies diesen Einkaufszettel (freier Zettel oder Ankreuzliste).' },
-  ], signal, { gruendlich: true });
+  const teile = fotoTeile(bild).map((t) => (t.text ? { text: t.text } : { inline_data: { mime_type: t.mediaType, data: t.base64 } }));
+  return frage(einstellungen, anweisungMit(kontext.bekannteArtikel), teile, signal);
 }
 
 export function erkenneText(text, einstellungen, signal, kontext = {}) {
   return frage(einstellungen, anweisungMit(kontext.bekannteArtikel, 'text'), [{ text: textNachricht(text) }], signal);
 }
 
-async function frage(einstellungen, anweisung, teile, signal, { gruendlich = false } = {}) {
+async function frage(einstellungen, anweisung, teile, signal, ersatzVersucht = false) {
   const schluessel = pruefeSchluessel(einstellungen);
   const anfrage = {
     systemInstruction: { parts: [{ text: anweisung }] },
@@ -96,9 +93,8 @@ async function frage(einstellungen, anweisung, teile, signal, { gruendlich = fal
     },
   };
   // Kurz nachdenken reicht zum Ablesen und ist um ein Vielfaches schneller als der Standard.
-  let denken = anbieterInfo('google').modelle.find((m) => m.id === einstellungen.modell)?.denken;
-  if (gruendlich && denken === 'low') denken = 'medium';
-  if (denken) anfrage.generationConfig.thinkingConfig = { thinkingLevel: denken };
+  const modell = anbieterInfo('google').modelle.find((m) => m.id === einstellungen.modell);
+  if (modell?.denken) anfrage.generationConfig.thinkingConfig = { thinkingLevel: modell.denken };
 
   const antwort = await sicherFetch(`${API}/models/${encodeURIComponent(einstellungen.modell)}:generateContent`, {
     method: 'POST',
@@ -106,6 +102,10 @@ async function frage(einstellungen, anweisung, teile, signal, { gruendlich = fal
     body: JSON.stringify(anfrage),
     signal,
   });
+  // Überlastet (503): einmal mit dem anderen Flash-Modell versuchen, bevor der zweite Dienst einspringt.
+  if (antwort.status === 503 && modell?.ersatz && !ersatzVersucht) {
+    return frage({ ...einstellungen, modell: modell.ersatz }, anweisung, teile, signal, true);
+  }
   if (!antwort.ok) throw geminiFehler(antwort.status, await fehlerNachricht(antwort));
 
   const daten = await antwort.json();
