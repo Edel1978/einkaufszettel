@@ -125,6 +125,7 @@ export function zeigeEinstellungen(app) {
             <small>Solange eine Liste offen ist, schaltet sich der Bildschirm nicht ab.</small></span>
         </label>
         <div data-install-bereich>${installHtml()}</div>
+        <p class="leise-text" data-version>App-Version wird ermittelt …</p>
       </section>
       <p class="leise-text zentriert">Änderungen werden automatisch gespeichert.</p>
     </form>`;
@@ -169,6 +170,14 @@ export function zeigeEinstellungen(app) {
   form.addEventListener('change', speichere);
   form.addEventListener('submit', (ev) => ev.preventDefault());
   zeigeAbschnitte();
+
+  // Version = Nummer des Offline-Speichers des Service Workers (z. B. "einkaufszettel-v6" → 6).
+  (async () => {
+    const namen = 'caches' in window ? await caches.keys() : [];
+    const nummer = namen.map((n) => n.match(/^einkaufszettel-v(\d+)$/)?.[1]).filter(Boolean).sort((a, b) => b - a)[0];
+    const el = form.querySelector('[data-version]');
+    if (el) el.textContent = nummer ? `App-Version ${nummer}` : 'App-Version: noch nicht offline gespeichert';
+  })();
 
   form.querySelector('[data-installieren]')?.addEventListener('click', async () => {
     await installiere();

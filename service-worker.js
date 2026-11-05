@@ -5,8 +5,12 @@
 //   Hintergrund die neue Version laden. Updates sind damit beim nächsten Öffnen aktiv.
 // - Auf dem PC (localhost): immer zuerst aus dem Netz, damit Änderungen sofort sichtbar sind.
 // Anfragen an andere Server (z. B. die KI-Dienste) werden nie zwischengespeichert.
+//
+// Wichtig: GitHub Pages erlaubt dem Browser, Dateien 10 Minuten zwischenzuspeichern. Damit ein
+// Update nicht versehentlich alte Dateien aus diesem Zwischenspeicher übernimmt, wird hier immer
+// am Server nachgefragt (cache: 'reload' bzw. 'no-cache').
 
-const CACHE = 'einkaufszettel-v5';
+const CACHE = 'einkaufszettel-v6';
 
 const APP_DATEIEN = [
   './',
@@ -49,7 +53,7 @@ const ENTWICKLUNG = ['localhost', '127.0.0.1'].includes(self.location.hostname);
 self.addEventListener('install', (ereignis) => {
   ereignis.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.addAll(APP_DATEIEN))
+      .then((cache) => cache.addAll(APP_DATEIEN.map((url) => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   );
 });
@@ -63,7 +67,7 @@ self.addEventListener('activate', (ereignis) => {
 });
 
 async function ausNetz(anfrage) {
-  const antwort = await fetch(anfrage);
+  const antwort = await fetch(anfrage, { cache: 'no-cache' });
   if (antwort.ok) {
     const cache = await caches.open(CACHE);
     await cache.put(anfrage, antwort.clone());
