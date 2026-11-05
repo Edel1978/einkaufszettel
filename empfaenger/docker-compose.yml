@@ -1,6 +1,8 @@
 # Excel-Empfänger der Einkaufszettel-App auf dem NAS: Programm + Tailscale (HTTPS im eigenen Tailnet)
 # Ordner auf dem NAS: /volume1/docker/einkauf (Pfade absolut, wie es die UGOS-Docker-App erwartet)
-# Vorher: Ordner listen und tailscale/state anlegen, dem Benutzer Docker Schreibrecht auf listen geben,
+# Die Listen landen in der Freigabe Netzlaufwerk_N, Ordner Einkaufslisten (am PC N:\Einkaufslisten),
+# damit der PC keinen Zugriff auf die Freigabe docker braucht.
+# Vorher: Ordner tailscale/state anlegen, dem Benutzer Docker Schreibrecht auf Einkaufslisten geben,
 # einkauf.env mit TS_AUTHKEY anlegen (Vorlage: einkauf.env.beispiel). Schritte: ANLEITUNG_NAS.md
 services:
   tailscale:
@@ -34,7 +36,7 @@ services:
       - tailscale
     user: "1006:100"               # UGOS-Benutzer "Docker", nie root
     volumes:
-      - /volume1/docker/einkauf/listen:/listen
+      - /volume1/Netzlaufwerk_N/Einkaufslisten:/listen
     security_opt:
       - no-new-privileges:true
     cap_drop:
