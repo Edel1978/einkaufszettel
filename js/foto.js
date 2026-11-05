@@ -578,6 +578,7 @@ async function uebernehmen(v) {
   // Für das Info-Blatt im Excel-Export: wie viele Fotos, und ob es eine Ankreuzliste ist.
   if (v.art === 'foto') liste.fotos = (liste.fotos ?? 0) + 1;
   if (v.kennung) liste.kennung = v.kennung;
+  if (v.dienst) liste.dienste = [...new Set([...(liste.dienste ?? []), v.dienst])];
   await app.sichere(liste);
 
   vorgang = null;

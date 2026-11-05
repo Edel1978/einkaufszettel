@@ -222,9 +222,8 @@ export function werteAntwortAus(daten) {
  * - angekreuzt, aber kein Eintrag dazu → Platzhalter zum Prüfen, damit nichts verloren geht
  */
 function gleicheMitMarkierungenAb(eintraege, markierungen) {
-  if (!Array.isArray(markierungen) || markierungen.length === 0) return;
   const zustand = new Map();
-  for (const m of markierungen) {
+  for (const m of Array.isArray(markierungen) ? markierungen : []) {
     const code = String(m?.code ?? '').toUpperCase().replace(/\s+/g, '');
     if (code && ZUSTAENDE.includes(m.zustand)) zustand.set(code, m.zustand);
   }
@@ -232,6 +231,10 @@ function gleicheMitMarkierungenAb(eintraege, markierungen) {
     const z = zustand.get(eintraege[i].code);
     if (z === 'durchgestrichen') eintraege.splice(i, 1);
     else if (z === 'unsicher') Object.assign(eintraege[i], { sicherheit: 'niedrig', unsicher: true });
+  }
+  // Codes sehen immer so aus: Zahl, evtl. mit A, B oder C dahinter („12“, „3B“). Alles andere ist verlesen.
+  for (const e of eintraege) {
+    if (e.code && !/^\d{1,3}[A-C]?$/.test(e.code)) Object.assign(e, { sicherheit: 'niedrig', unsicher: true });
   }
   const vorhanden = new Set(eintraege.map((e) => e.code).filter(Boolean));
   for (const [code, z] of zustand) {

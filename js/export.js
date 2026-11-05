@@ -45,6 +45,7 @@ export function infoZeilen(liste, zeitpunkt = new Date()) {
     ['Feld', 'Wert'],
     ['Kennung', liste.kennung ?? ''],
     ['Fotos', liste.fotos ?? ''],
+    ['Erkannt mit', (liste.dienste ?? []).join(', ')],
     ['Liste', liste.name ?? ''],
     ['Exportiert', `${dateiName(zeitpunkt).slice(14, 24)} ${String(zeitpunkt.getHours()).padStart(2, '0')}:${String(zeitpunkt.getMinutes()).padStart(2, '0')}`],
   ];
