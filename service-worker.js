@@ -10,7 +10,7 @@
 // Update nicht versehentlich alte Dateien aus diesem Zwischenspeicher übernimmt, wird hier immer
 // am Server nachgefragt (cache: 'reload' bzw. 'no-cache').
 
-const CACHE = 'einkaufszettel-v16';
+const CACHE = 'einkaufszettel-v17';
 
 const APP_DATEIEN = [
   './',

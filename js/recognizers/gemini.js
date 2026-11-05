@@ -96,16 +96,27 @@ async function frage(einstellungen, anweisung, teile, signal, ersatzVersucht = f
   const modell = anbieterInfo('google').modelle.find((m) => m.id === einstellungen.modell);
   if (modell?.denken) anfrage.generationConfig.thinkingConfig = { thinkingLevel: modell.denken };
 
-  const antwort = await sicherFetch(`${API}/models/${encodeURIComponent(einstellungen.modell)}:generateContent`, {
-    method: 'POST',
-    headers: { 'x-goog-api-key': schluessel, 'content-type': 'application/json' },
-    body: JSON.stringify(anfrage),
-    signal,
-  });
-  // Überlastet (503): einmal mit dem anderen Flash-Modell versuchen, bevor der zweite Dienst einspringt.
-  if (antwort.status === 503 && modell?.ersatz && !ersatzVersucht) {
-    return frage({ ...einstellungen, modell: modell.ersatz }, anweisung, teile, signal, true);
+  // Überlastet (503), Kontingent dieses Modells leer (429) oder hängt die Anfrage: einmal mit dem
+  // anderen Flash-Modell versuchen (eigenes Kontingent), bevor der zweite Dienst einspringt.
+  const ersatz = modell?.ersatz && !ersatzVersucht ? modell.ersatz : null;
+  const mitErsatz = () => frage({ ...einstellungen, modell: ersatz }, anweisung, teile, signal, true);
+  const zeitgrenze = AbortSignal.timeout(ersatz ? 45000 : 90000);
+  let antwort;
+  try {
+    antwort = await sicherFetch(`${API}/models/${encodeURIComponent(einstellungen.modell)}:generateContent`, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': schluessel, 'content-type': 'application/json' },
+      body: JSON.stringify(anfrage),
+      signal: signal ? AbortSignal.any([signal, zeitgrenze]) : zeitgrenze,
+    });
+  } catch (fehler) {
+    if (zeitgrenze.aborted && !signal?.aborted) {
+      if (ersatz) return mitErsatz();
+      throw new ErkennungsFehler('ueberlastet', 'Gemini antwortet gerade nicht (überlastet). Bitte gleich noch einmal versuchen.');
+    }
+    throw fehler;
   }
+  if ((antwort.status === 503 || antwort.status === 429) && ersatz) return mitErsatz();
   if (!antwort.ok) throw geminiFehler(antwort.status, await fehlerNachricht(antwort));
 
   const daten = await antwort.json();
