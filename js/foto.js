@@ -392,7 +392,7 @@ function pruefHtml(v) {
 
 function pruefEintragHtml(v, e, i) {
   return `
-    <li class="pruef-eintrag${e.unsicher ? ' unsicher' : ''}${e.uebernehmen ? '' : ' aus'}" data-i="${i}">
+    <li class="pruef-eintrag${e.sicherheit === 'niedrig' ? ' unsicher' : e.sicherheit === 'mittel' ? ' mittel' : ''}${e.uebernehmen ? '' : ' aus'}" data-i="${i}">
       <div class="pruef-zeile">
         <input type="checkbox" class="pruef-check" data-feld="uebernehmen"${e.uebernehmen ? ' checked' : ''} aria-label="Übernehmen">
         <input type="text" class="pruef-name" data-feld="name" value="${esc(e.name)}" aria-label="Artikel" placeholder="Artikel">
@@ -407,13 +407,19 @@ function pruefEintragHtml(v, e, i) {
           ${KATEGORIEN.map((k) => `<option value="${k.id}"${k.id === e.kategorie ? ' selected' : ''}>${esc(k.name)}</option>`).join('')}
         </select>
       </div>
+      <input type="text" class="pruef-notiz" data-feld="notiz" value="${esc(e.notiz ?? '')}" aria-label="Notiz" placeholder="Notiz (Marke, Sorte, bio …)">
+      ${e.original ? `<p class="pruef-original">${v.art === 'sprache' ? 'Gehört' : 'Gelesen'}: „${esc(e.original)}“</p>` : ''}
       <div class="pruef-hinweise">${hinweiseHtml(v, e)}</div>
     </li>`;
 }
 
 function hinweiseHtml(v, e) {
   const teile = [];
-  if (e.unsicher) teile.push(`<p class="pruef-hinweis warnung">${v.art === 'sprache' ? 'Nicht sicher verstanden' : 'Schwer lesbar'} – bitte prüfen</p>`);
+  if (e.sicherheit === 'niedrig') {
+    teile.push(`<p class="pruef-hinweis warnung">${v.art === 'sprache' ? 'Nicht sicher verstanden' : 'Schwer lesbar'} – bitte prüfen</p>`);
+  } else if (e.sicherheit === 'mittel') {
+    teile.push('<p class="pruef-hinweis">Wahrscheinlich richtig – kurz prüfen</p>');
+  }
   const liste = zielListe(v);
   const vorhanden = liste && e.name.trim() ? findeDoppelt(liste, e.name) : null;
   if (vorhanden) {
@@ -510,8 +516,9 @@ async function beiKlick(ev) {
     }
     case 'ergaenzen':
       v.eintraege.push({
-        name: '', menge: null, mengeText: '', einheit: '', kategorie: STANDARD_KATEGORIE,
-        erkannteKategorie: STANDARD_KATEGORIE, unsicher: false, uebernehmen: true, zusammenfuehren: true,
+        name: '', menge: null, mengeText: '', einheit: '', notiz: '', original: '', sicherheit: 'hoch',
+        kategorie: STANDARD_KATEGORIE, erkannteKategorie: STANDARD_KATEGORIE, unsicher: false,
+        uebernehmen: true, zusammenfuehren: true,
       });
       zeigeFoto();
       app.inhalt.querySelector('.pruef-eintrag:last-child .pruef-name')?.focus();
@@ -529,6 +536,9 @@ async function uebernehmen(v) {
       name: e.name.trim(),
       menge: leseZahl(e.mengeText),
       einheit: e.einheit.trim(),
+      notiz: (e.notiz ?? '').trim(),
+      original: e.original ?? '',
+      sicherheit: e.sicherheit ?? 'hoch',
       kategorie: e.kategorie,
       zusammenfuehren: e.zusammenfuehren,
     }));

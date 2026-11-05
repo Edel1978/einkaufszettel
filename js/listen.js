@@ -1,7 +1,8 @@
 // Datenmodell und Logik für Listen und Einträge (ohne Oberfläche).
 //
 // Liste:   { id, name, erstelltAm, geaendertAm, eintraege[] }
-// Eintrag: { id, name, menge, einheit, kategorie, erledigt, reihenfolge, geaendertAm }
+// Eintrag: { id, name, menge, einheit, notiz, original, sicherheit, kategorie, erledigt, reihenfolge, geaendertAm }
+//   notiz: Marke/Sorte/Zusatz; original: so wie auf dem Zettel gelesen; sicherheit: 'hoch' | 'mittel' | 'niedrig'
 
 import { neueId, jetzt } from './util.js';
 import { STANDARD_KATEGORIE, kategorieRang, aktuelleKategorie } from './kategorien.js';
@@ -29,12 +30,17 @@ export function neueListe(name) {
   return { id: neueId(), name, erstelltAm: zeit, geaendertAm: zeit, eintraege: [] };
 }
 
-export function neuerEintrag({ name, menge = null, einheit = '', kategorie = STANDARD_KATEGORIE }, reihenfolge = 0) {
+export function neuerEintrag({
+  name, menge = null, einheit = '', notiz = '', original = '', sicherheit = 'hoch', kategorie = STANDARD_KATEGORIE,
+}, reihenfolge = 0) {
   return {
     id: neueId(),
     name: name.trim(),
     menge,
     einheit: einheit.trim(),
+    notiz: notiz.trim(),
+    original: original.trim(),
+    sicherheit,
     kategorie,
     erledigt: false,
     reihenfolge,
@@ -193,7 +199,11 @@ export function uebernehmeEintraege(liste, eintraege) {
   for (const neu of eintraege) {
     const vorhanden = neu.zusammenfuehren ? findeDoppelt(liste, neu.name) : null;
     if (vorhanden) {
-      aendereEintrag(liste, vorhanden.id, { ...zusammengefuehrt(vorhanden, neu), erledigt: false });
+      aendereEintrag(liste, vorhanden.id, {
+        ...zusammengefuehrt(vorhanden, neu),
+        notiz: vorhanden.notiz || neu.notiz || '',
+        erledigt: false,
+      });
     } else {
       fuegeEintragHinzu(liste, neu);
     }

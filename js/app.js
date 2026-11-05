@@ -17,6 +17,7 @@ import { zeigeEinstellungen } from './einstellungen-seite.js';
 import { ladeEinstellungen } from './einstellungen.js';
 import { halteBildschirmAn } from './wachhalten.js';
 import { wendeDarstellungAn } from './darstellung.js';
+import { exportWege, exportiere } from './export.js';
 import {
   registriereServiceWorker, kannInstallieren, installiere, beiInstallierbarkeit,
   installHinweisAusgeblendet, blendeInstallHinweisAus,
@@ -231,10 +232,11 @@ async function legeListeAn() {
 }
 
 async function listenMenue(liste) {
-  const { erledigt } = fortschritt(liste);
+  const { gesamt, erledigt } = fortschritt(liste);
   const wahl = await menue({
     titel: liste.name,
     optionen: [
+      ...(gesamt > erledigt ? [{ wert: 'exportieren', text: `Als Excel exportieren (${gesamt - erledigt} offen)` }] : []),
       ...(erledigt > 0 ? [
         { wert: 'erledigte-entfernen', text: `Erledigte entfernen (${erledigt})` },
         { wert: 'zuruecksetzen', text: 'Alle Häkchen zurücksetzen' },
@@ -245,7 +247,9 @@ async function listenMenue(liste) {
     ],
   });
 
-  if (wahl === 'erledigte-entfernen') {
+  if (wahl === 'exportieren') {
+    await exportiereListe(liste);
+  } else if (wahl === 'erledigte-entfernen') {
     const entfernt = entferneErledigte(liste);
     await sichere(liste);
     zeige();
@@ -286,6 +290,20 @@ async function listenMenue(liste) {
     meldung('Liste gelöscht');
     if (location.hash === '#/') zeige();
     else location.hash = '#/';
+  }
+}
+
+/** Fragt nach dem Weg (Ordner, Teilen, Herunterladen) und exportiert die offenen Artikel. */
+async function exportiereListe(liste) {
+  const wege = await exportWege();
+  const weg = wege.length === 1 ? wege[0].wert : await menue({ titel: 'Als Excel exportieren', optionen: wege });
+  if (!weg) return;
+  try {
+    const ergebnis = await exportiere(liste, weg);
+    if (ergebnis) meldung(`${ergebnis.name} – ${ergebnis.wo}`);
+  } catch (fehler) {
+    console.error(fehler);
+    meldung(`Export fehlgeschlagen: ${fehler.message}`);
   }
 }
 
@@ -347,10 +365,13 @@ function zeigeListe(liste) {
     const name = String(daten.get('name')).trim();
     if (!name) return;
     const kategorie = rateKategorie(name);
+    const menge = leseZahl(daten.get('menge'));
+    const einheit = String(daten.get('einheit'));
     fuegeEintragHinzu(liste, {
       name,
-      menge: leseZahl(daten.get('menge')),
-      einheit: String(daten.get('einheit')),
+      menge,
+      einheit,
+      original: [formatZahl(menge), einheit.trim(), name].filter(Boolean).join(' '),
       kategorie,
     });
     await sichere(liste);
@@ -396,7 +417,10 @@ function eintragHtml(e) {
     <li class="eintrag${e.erledigt ? ' erledigt' : ''}${frisch}" data-id="${esc(e.id)}">
       <button class="eintrag-haupt" type="button" role="checkbox" aria-checked="${e.erledigt}" data-aktion="umschalten">
         <span class="haken" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
-        <span class="eintrag-name">${esc(e.name)}</span>
+        <span class="eintrag-text">
+          <span class="eintrag-name">${esc(e.name)}</span>
+          ${e.notiz ? `<span class="eintrag-notiz">${esc(e.notiz)}</span>` : ''}
+        </span>
         ${e.erledigt && menge ? `<span class="eintrag-menge">${esc(menge)}</span>` : ''}
       </button>
       ${e.erledigt ? '' : `
@@ -420,6 +444,8 @@ async function bearbeiteEintrag(liste, id) {
     inhaltHtml: `
       <label class="feld"><span>Artikel</span>
         <input name="name" type="text" value="${esc(e.name)}" required></label>
+      <label class="feld"><span>Notiz (Marke, Sorte, bio …)</span>
+        <input name="notiz" type="text" value="${esc(e.notiz ?? '')}"></label>
       <div class="feld-zeile">
         <label class="feld feld-menge"><span>Menge</span>
           <input name="menge" type="text" inputmode="decimal" value="${esc(formatZahl(e.menge))}"></label>
@@ -446,6 +472,7 @@ async function bearbeiteEintrag(liste, id) {
       name,
       menge: leseZahl(daten.get('menge')),
       einheit: String(daten.get('einheit')).trim(),
+      notiz: String(daten.get('notiz') ?? '').trim(),
       kategorie,
     });
   } else if (wert === 'loeschen') {

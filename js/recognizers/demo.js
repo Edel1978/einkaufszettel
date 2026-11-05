@@ -5,13 +5,13 @@ import { werteAntwortAus, ErkennungsFehler } from './gemeinsam.js';
 
 const BEISPIEL = {
   eintraege: [
-    { name: 'Milch', menge: 2, einheit: 'l', kategorie: 'milch-kuehl', unsicher: false },
-    { name: 'Hackfleisch', menge: 500, einheit: 'g', kategorie: 'fleisch-wurst', unsicher: false },
-    { name: 'Tomaten', menge: 6, einheit: '', kategorie: 'obst-gemuese', unsicher: false },
-    { name: 'Spaghetti', menge: 1, einheit: 'Pck.', kategorie: 'vorrat', unsicher: false },
-    { name: 'Parmesan', menge: null, einheit: '', kategorie: 'milch-kuehl', unsicher: true },
-    { name: 'Brötchen', menge: 4, einheit: '', kategorie: 'brot', unsicher: false },
-    { name: 'Spülmittel', menge: null, einheit: '', kategorie: 'haushalt', unsicher: false },
+    { name: 'Milch', menge: 2, einheit: 'l', notiz: '3,8 %', original: '2 l Milch (3,8)', kategorie: 'milch-kuehl', sicherheit: 'hoch' },
+    { name: 'Hackfleisch', menge: 500, einheit: 'g', notiz: 'gemischt', original: '500g Hack gem.', kategorie: 'fleisch-wurst', sicherheit: 'mittel' },
+    { name: 'Tomaten', menge: 6, einheit: '', notiz: '', original: '6 Tomaten', kategorie: 'obst-gemuese', sicherheit: 'hoch' },
+    { name: 'Spaghetti', menge: 1, einheit: 'Pck.', notiz: '', original: '1 Pck. Spaghetti', kategorie: 'vorrat', sicherheit: 'hoch' },
+    { name: 'Parmesan', menge: null, einheit: '', notiz: '', original: 'Parmasan?', kategorie: 'milch-kuehl', sicherheit: 'niedrig' },
+    { name: 'Brötchen', menge: 4, einheit: '', notiz: '', original: '4 Brötchen', kategorie: 'brot', sicherheit: 'hoch' },
+    { name: 'Spülmittel', menge: null, einheit: '', notiz: 'Pril', original: 'Pril Spüli', kategorie: 'haushalt', sicherheit: 'hoch' },
   ],
   hinweis: '',
 };
@@ -55,9 +55,10 @@ export function zerlegeDiktat(text) {
   return text
     .replace(FUELLWOERTER, ' ')
     .split(TRENNER)
-    .map((teil) => teil.trim().split(/\s+/).filter(Boolean))
-    .filter((woerter) => woerter.length > 0)
-    .map((woerter) => {
+    .map((teil) => teil.trim())
+    .filter(Boolean)
+    .map((original) => {
+      const woerter = original.split(/\s+/);
       let menge = null;
       let einheit = '';
       const erstes = woerter[0].toLowerCase().replace(',', '.');
@@ -83,7 +84,9 @@ export function zerlegeDiktat(text) {
         woerter.shift();
       }
       const name = woerter.join(' ');
-      return { name: name.charAt(0).toUpperCase() + name.slice(1), menge, einheit, kategorie: '', unsicher: false };
+      return {
+        name: name.charAt(0).toUpperCase() + name.slice(1), menge, einheit, notiz: '', original, kategorie: '', sicherheit: 'hoch',
+      };
     })
     .filter((e) => e.name);
 }

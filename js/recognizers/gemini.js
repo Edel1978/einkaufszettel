@@ -3,7 +3,7 @@
 // Der API-Schlüssel kommt aus den Einstellungen und wird nur an generativelanguage.googleapis.com gesendet.
 
 import {
-  anweisungMit, textNachricht, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
+  anweisungMit, textNachricht, SICHERHEITEN, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
 } from './gemeinsam.js';
 import { KATEGORIEN } from '../kategorien.js';
 import { anbieterInfo } from '../einstellungen.js';
@@ -22,11 +22,13 @@ const GEMINI_SCHEMA = {
           name: { type: 'STRING' },
           menge: { type: 'NUMBER', nullable: true },
           einheit: { type: 'STRING' },
+          notiz: { type: 'STRING' },
+          original: { type: 'STRING' },
           kategorie: { type: 'STRING', enum: KATEGORIEN.map((k) => k.id) },
-          unsicher: { type: 'BOOLEAN' },
+          sicherheit: { type: 'STRING', enum: SICHERHEITEN },
         },
-        required: ['name', 'menge', 'einheit', 'kategorie', 'unsicher'],
-        propertyOrdering: ['name', 'menge', 'einheit', 'kategorie', 'unsicher'],
+        required: ['name', 'menge', 'einheit', 'notiz', 'original', 'kategorie', 'sicherheit'],
+        propertyOrdering: ['original', 'name', 'menge', 'einheit', 'notiz', 'kategorie', 'sicherheit'],
       },
     },
     hinweis: { type: 'STRING' },

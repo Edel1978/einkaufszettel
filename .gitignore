@@ -12,3 +12,7 @@ Einkaufszettel app.md
 node_modules/
 .DS_Store
 Thumbs.db
+
+# Interne Übergaben zwischen Sitzungen
+UEBERGABE_*.md
+RUECKMELDUNG_*.md
