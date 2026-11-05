@@ -37,6 +37,10 @@ const REGELN_ANKREUZLISTE = `
 Gedruckte Ankreuzliste:
 - Manche Fotos zeigen keinen freien Zettel, sondern eine gedruckte Ankreuzliste. Du erkennst sie an „ANKREUZLISTE JJJJ-MM-TT“ oben rechts oder in der Fußzeile (z. B. „ANKREUZLISTE 2026-11-05“). Dann trägst du genau diesen Text in "kennung" ein. Bei einem freien Zettel ist "kennung" leer.
 - Aufbau: Artikel nach Bereichen (Obst & Gemüse, Brot, Kühlregal …) in zwei Spalten. Jeder Artikel hat eine Zeile mit dem Begriff fett links und „Anzahl ____“ rechts. Darunter stehen eine bis drei Varianten nebeneinander, jede mit einem Kästchen, direkt darunter einem fetten Code (z. B. „43B“; nur eine Zahl wie „12“, wenn es nur eine Variante gibt), einem Produktbild, dem Produktnamen und dem Preis. Bei „nur im Markt“ gibt es Kästchen und Code, aber kein Produkt.
+- Vorgehen in zwei Schritten:
+  1. Geh die Liste Bereich für Bereich und Spalte für Spalte durch und schau JEDES Kästchen einzeln an. Trag in "markierungen" jedes Kästchen ein, in dem irgendein Strich ist – mit seinem Code und zustand: "angekreuzt" (gültiges Kreuz/Haken), "durchgestrichen" (Kreuz wurde widerrufen, siehe unten) oder "unsicher" (nicht klar erkennbar). Leere Kästchen trägst du nicht ein.
+  2. Erst danach erstellst du "eintraege": je einen für jedes Kästchen mit zustand "angekreuzt" oder "unsicher" (dann sicherheit "niedrig"), keinen für "durchgestrichen". Dazu kommt alles Handgeschriebene.
+- Bei einem freien Zettel ist "markierungen" leer.
 - WICHTIG: Gedruckte Produkte sind KEINE Einkaufswünsche. Übernimm nur Varianten, deren Kästchen angekreuzt ist (Kreuz, Haken, ausgemalt oder eingekreist). Leere Kästchen ignorierst du, auch wenn das Produkt dasteht. Prüfe jedes Kästchen einzeln.
 - WIDERRUFEN = WEGLASSEN: Wurde ein Kreuz nachträglich durchgestrichen, ist es keine Bestellung. Typisches Bild: ein Kreuz im Kästchen und zusätzlich ein langer Strich, der über das Kästchen und den Code hinausgeht; oder die Zahl bei „Anzahl“ ist durchgestrichen; oder die ganze Zeile ist durchgestrichen. Solche Artikel lässt du komplett weg (auch nicht als „Anzahl ohne Kreuz“). Eine durchgestrichene Anzahl gilt als nicht eingetragen.
 - Für einen angekreuzten Artikel füllst du die Felder so:
@@ -80,7 +84,7 @@ Regeln:
 - Feld "original": der Teil des Textes, der zu diesem Artikel gehört, wörtlich (z. B. „zwei Liter Milch“).
 ${REGELN_ARTIKEL}
 - Enthält der Text keine Artikel, gib eine leere Liste zurück und erkläre kurz in "hinweis", woran es liegt. Sonst ist "hinweis" leer.
-- "kennung" ist beim Diktat immer leer, "code" leer und "quelle" immer "handschrift".`;
+- "kennung" ist beim Diktat immer leer, "markierungen" leer, "code" leer und "quelle" immer "handschrift".`;
 
 /**
  * Anweisung plus die Artikel, die der Nutzer schon auf seinen Listen hatte.
@@ -103,11 +107,24 @@ export function textNachricht(text) {
 
 export const SICHERHEITEN = ['hoch', 'mittel', 'niedrig'];
 export const QUELLEN = ['handschrift', 'ankreuzliste'];
+export const ZUSTAENDE = ['angekreuzt', 'durchgestrichen', 'unsicher'];
 
 export const ANTWORT_SCHEMA = {
   type: 'object',
   properties: {
     kennung: { type: 'string' },
+    markierungen: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          code: { type: 'string' },
+          zustand: { type: 'string', enum: ZUSTAENDE },
+        },
+        required: ['code', 'zustand'],
+        additionalProperties: false,
+      },
+    },
     eintraege: {
       type: 'array',
       items: {
@@ -129,7 +146,7 @@ export const ANTWORT_SCHEMA = {
     },
     hinweis: { type: 'string' },
   },
-  required: ['kennung', 'eintraege', 'hinweis'],
+  required: ['kennung', 'markierungen', 'eintraege', 'hinweis'],
   additionalProperties: false,
 };
 
@@ -189,12 +206,49 @@ export function werteAntwortAus(daten) {
 
   const hinweis = typeof daten?.hinweis === 'string' ? daten.hinweis.trim() : '';
   const kennung = normaleKennung(daten?.kennung);
+  gleicheMitMarkierungenAb(eintraege, daten?.markierungen);
   if (eintraege.length === 0) {
     throw new ErkennungsFehler('nichts-erkannt', hinweis
       ? `Es wurden keine Artikel erkannt: ${hinweis}`
       : 'Auf dem Foto wurden keine Artikel erkannt. Versuche es mit einem schärferen, gut beleuchteten Foto.');
   }
   return { kennung, eintraege, hinweis };
+}
+
+/**
+ * Ankreuzliste: Einträge mit der Liste der markierten Kästchen abgleichen.
+ * - durchgestrichen → Eintrag fällt weg
+ * - unsicher → sicherheit "niedrig"
+ * - angekreuzt, aber kein Eintrag dazu → Platzhalter zum Prüfen, damit nichts verloren geht
+ */
+function gleicheMitMarkierungenAb(eintraege, markierungen) {
+  if (!Array.isArray(markierungen) || markierungen.length === 0) return;
+  const zustand = new Map();
+  for (const m of markierungen) {
+    const code = String(m?.code ?? '').toUpperCase().replace(/\s+/g, '');
+    if (code && ZUSTAENDE.includes(m.zustand)) zustand.set(code, m.zustand);
+  }
+  for (let i = eintraege.length - 1; i >= 0; i--) {
+    const z = zustand.get(eintraege[i].code);
+    if (z === 'durchgestrichen') eintraege.splice(i, 1);
+    else if (z === 'unsicher') Object.assign(eintraege[i], { sicherheit: 'niedrig', unsicher: true });
+  }
+  const vorhanden = new Set(eintraege.map((e) => e.code).filter(Boolean));
+  for (const [code, z] of zustand) {
+    if (z === 'durchgestrichen' || vorhanden.has(code)) continue;
+    eintraege.push({
+      name: `Code ${code}`,
+      menge: 1,
+      einheit: '',
+      notiz: 'Angekreuzt, aber nicht ausgelesen – bitte prüfen',
+      original: '',
+      code,
+      quelle: 'ankreuzliste',
+      kategorie: STANDARD_KATEGORIE,
+      sicherheit: 'niedrig',
+      unsicher: true,
+    });
+  }
 }
 
 /** Übersetzt HTTP-Fehler in verständliche Meldungen. */

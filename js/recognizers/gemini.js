@@ -3,7 +3,7 @@
 // Der API-Schlüssel kommt aus den Einstellungen und wird nur an generativelanguage.googleapis.com gesendet.
 
 import {
-  anweisungMit, textNachricht, SICHERHEITEN, QUELLEN, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
+  anweisungMit, textNachricht, SICHERHEITEN, QUELLEN, ZUSTAENDE, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
 } from './gemeinsam.js';
 import { KATEGORIEN } from '../kategorien.js';
 import { anbieterInfo } from '../einstellungen.js';
@@ -35,9 +35,21 @@ const GEMINI_SCHEMA = {
     },
     hinweis: { type: 'STRING' },
     kennung: { type: 'STRING' },
+    markierungen: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          code: { type: 'STRING' },
+          zustand: { type: 'STRING', enum: ZUSTAENDE },
+        },
+        required: ['code', 'zustand'],
+        propertyOrdering: ['code', 'zustand'],
+      },
+    },
   },
-  required: ['kennung', 'eintraege', 'hinweis'],
-  propertyOrdering: ['kennung', 'eintraege', 'hinweis'],
+  required: ['kennung', 'markierungen', 'eintraege', 'hinweis'],
+  propertyOrdering: ['kennung', 'markierungen', 'eintraege', 'hinweis'],
 };
 
 function pruefeSchluessel(einstellungen) {
