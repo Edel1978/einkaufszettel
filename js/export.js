@@ -154,19 +154,34 @@ export async function exportiere(liste, weg) {
     const name = naechsterName();
     const datei = new File([bytes], name, { type: MIME });
     if (weg === 'teilen') {
-      await navigator.share({ files: [datei], title: name });
-      return { name, wo: 'geteilt' };
+      try {
+        await navigator.share({ files: [datei], title: name });
+        return { name, wo: 'geteilt' };
+      } catch (fehler) {
+        // Chrome auf Android lässt Web-Apps keine Excel-Dateien teilen ("Permission denied"),
+        // obwohl canShare() vorher ja sagt. Dann stattdessen herunterladen.
+        if (fehler.name !== 'NotAllowedError') throw fehler;
+        herunterladen(datei);
+        return {
+          name,
+          wo: 'Teilen von Excel-Dateien erlaubt Chrome nicht – die Datei liegt in „Downloads“. Von dort mit der Dateien-App teilen (z. B. an Tailscale).',
+        };
+      }
     }
 
-    const url = URL.createObjectURL(datei);
-    const link = Object.assign(document.createElement('a'), { href: url, download: name });
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    herunterladen(datei);
     return { name, wo: 'Downloads' };
   } catch (fehler) {
     if (fehler.name === 'AbortError') return null; // Auswahl oder Teilen abgebrochen
     throw fehler;
   }
+}
+
+function herunterladen(datei) {
+  const url = URL.createObjectURL(datei);
+  const link = Object.assign(document.createElement('a'), { href: url, download: datei.name });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }

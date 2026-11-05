@@ -300,7 +300,7 @@ async function exportiereListe(liste) {
   if (!weg) return;
   try {
     const ergebnis = await exportiere(liste, weg);
-    if (ergebnis) meldung(`${ergebnis.name} – ${ergebnis.wo}`);
+    if (ergebnis) meldung(`${ergebnis.name} – ${ergebnis.wo}`, { dauer: ergebnis.wo.length > 40 ? 9000 : 3500 });
   } catch (fehler) {
     console.error(fehler);
     meldung(`Export fehlgeschlagen: ${fehler.message}`);
