@@ -10,6 +10,7 @@ import { browserErkennungVerfuegbar, aufnahmeVerfuegbar } from './sprache.js';
 import { testeVerbindung, dienstName } from './recognizers/index.js';
 import { kannInstallieren, istInstalliert, installiere } from './installieren.js';
 import { esc } from './util.js';
+import { testePc } from './export.js';
 
 function installHtml() {
   if (istInstalliert()) return '<p class="leise-text">Die App ist installiert und läuft vom Startbildschirm.</p>';
@@ -109,6 +110,15 @@ export function zeigeEinstellungen(app) {
       </section>
 
       <section class="block">
+        <h2>Excel-Export an den PC</h2>
+        <label class="feld"><span>Adresse des PC-Empfängers</span>
+          <input name="pcAdresse" type="url" value="${esc(e.pcAdresse)}" placeholder="https://…ts.net/einkaufszettel" spellcheck="false" autocapitalize="off"></label>
+        <p class="leise-text">Dann gibt es beim Export „An den PC senden“. Der PC muss an sein und Tailscale auf beiden Geräten verbunden.</p>
+        <button class="btn btn-breit" type="button" data-pc-testen>PC-Verbindung testen</button>
+        <div class="test-ergebnis" data-pc-ergebnis role="status" hidden></div>
+      </section>
+
+      <section class="block">
         <h2>App</h2>
         <div class="feld"><span>Darstellung</span>
           <div class="segmente" role="radiogroup" aria-label="Darstellung">
@@ -190,6 +200,22 @@ export function zeigeEinstellungen(app) {
       feld.type = feld.type === 'password' ? 'text' : 'password';
       knopf.textContent = feld.type === 'password' ? 'Zeigen' : 'Verbergen';
     });
+  });
+
+  form.querySelector('[data-pc-testen]').addEventListener('click', async (ev) => {
+    speichere();
+    const knopf = ev.target;
+    const feld = form.querySelector('[data-pc-ergebnis]');
+    knopf.disabled = true;
+    feld.hidden = false;
+    feld.textContent = 'Teste Verbindung …';
+    try {
+      const ordner = await testePc();
+      feld.innerHTML = `<p class="ok">✓ Verbunden – Dateien landen im Ordner „${esc(ordner)}“.</p>`;
+    } catch (fehler) {
+      feld.innerHTML = `<p class="fehler">✗ ${esc(fehler.message)}</p>`;
+    }
+    knopf.disabled = false;
   });
 
   // Testet beide gewählten Dienste und zeigt je eine Zeile.

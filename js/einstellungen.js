@@ -78,6 +78,7 @@ const STANDARD = {
   bildschirmAn: true, // Bildschirm in der Einkaufsliste nicht ausgehen lassen
   spracheingabe: 'browser',
   darstellung: 'auto', // 'auto' (wie das Handy), 'hell' oder 'dunkel'
+  pcAdresse: '', // Empfänger auf dem PC (über Tailscale), z. B. https://mein-pc.tailnet.ts.net/einkaufszettel
 };
 
 export function anbieterInfo(id) {

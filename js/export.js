@@ -3,12 +3,14 @@
 //   ein Artikel pro Zeile (nur offene Artikel), Dateiname Einkaufsliste_JJJJ-MM-TT(_2).xlsx.
 //
 // Wege, die Datei loszuwerden:
+//   - "pc":            an den Empfänger auf dem PC schicken (pc-empfaenger/, über Tailscale)
 //   - "ordner":        am PC (Chrome/Edge) direkt in einen einmal gewählten Ordner speichern
-//   - "teilen":        Teilen-Menü des Handys (Mail, Drive, Tailscale/Taildrop …)
+//   - "teilen":        Teilen-Menü (nicht auf Android: Chrome lässt dort keine Excel-Dateien teilen)
 //   - "herunterladen": normaler Download
 
 import { erzeugeXlsx } from './xlsx.js';
 import { formatZahl } from './util.js';
+import { ladeEinstellungen } from './einstellungen.js';
 
 export const SPALTEN = ['Artikel', 'Menge', 'Einheit', 'Notiz', 'Original', 'Sicherheit'];
 const BREITEN = [24, 9, 10, 26, 32, 11];
@@ -118,18 +120,52 @@ async function freierName(ordner) {
   }
 }
 
+// ---------- Empfänger auf dem PC ----------
+
+function ohneSchraegstrich(adresse) {
+  return String(adresse ?? '').trim().replace(/\/+$/, '');
+}
+
+function pcAdresse() {
+  return ohneSchraegstrich(ladeEinstellungen().pcAdresse);
+}
+
+async function anPc(adresse, pfad, optionen = {}) {
+  let antwort;
+  try {
+    antwort = await fetch(`${adresse}/${pfad}`, {
+      ...optionen,
+      headers: { 'X-Einkaufszettel': '1', ...optionen.headers },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch {
+    throw new Error('PC nicht erreichbar. Ist der PC an und Tailscale auf beiden Geräten verbunden?');
+  }
+  const daten = await antwort.json().catch(() => ({}));
+  if (!antwort.ok) throw new Error(daten.fehler || `Der PC antwortet mit Fehler ${antwort.status}`);
+  return daten;
+}
+
+/** Prüft die Verbindung zum Empfänger; liefert den Namen des Zielordners. */
+export async function testePc(adresse = pcAdresse()) {
+  if (!adresse) throw new Error('Keine Adresse eingetragen');
+  return (await anPc(ohneSchraegstrich(adresse), 'status')).ordner;
+}
+
 // ---------- Export ----------
 
 /** Welche Wege auf diesem Gerät gehen. */
 export async function exportWege() {
   const wege = [];
+  if (pcAdresse()) wege.push({ wert: 'pc', text: 'An den PC senden' });
   if (ordnerMoeglich()) {
     const ordner = await gemerkterOrdner();
     wege.push({ wert: 'ordner', text: ordner ? `In Ordner „${ordner}“ speichern` : 'In einen Ordner speichern …' });
     if (ordner) wege.push({ wert: 'ordner-neu', text: 'In anderen Ordner speichern …' });
   }
   const probe = new File([new Uint8Array(1)], 'probe.xlsx', { type: MIME });
-  if (navigator.canShare?.({ files: [probe] })) wege.push({ wert: 'teilen', text: 'Teilen (Mail, Drive, Tailscale …)' });
+  if (!/Android/i.test(navigator.userAgent) && navigator.canShare?.({ files: [probe] })) wege.push({ wert: 'teilen', text: 'Teilen (Mail, Drive, Tailscale …)' });
   wege.push({ wert: 'herunterladen', text: 'Herunterladen' });
   return wege;
 }
@@ -141,6 +177,15 @@ export async function exportWege() {
 export async function exportiere(liste, weg) {
   const bytes = erzeugeExportDatei(liste);
   try {
+    if (weg === 'pc') {
+      const daten = await anPc(pcAdresse(), 'liste', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: new Blob([bytes], { type: MIME }),
+      });
+      return { name: daten.name, wo: `am PC im Ordner „${daten.ordner}“` };
+    }
+
     if (weg === 'ordner' || weg === 'ordner-neu') {
       const ordner = await holeOrdner(weg === 'ordner-neu');
       const name = await freierName(ordner);
