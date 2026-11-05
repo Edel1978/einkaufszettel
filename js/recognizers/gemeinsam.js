@@ -27,7 +27,7 @@ const REGELN_ARTIKEL = `- Feld "name": nur der Artikel selbst, so wie man ihn au
 - Ordne jeden Artikel einer Kategorie zu (Feld "kategorie", nur die ID):
 ${KATEGORIEN.map((k) => `  - ${k.id}: ${k.name} (z. B. ${k.beispiele})`).join('\n')}
 - Fasse doppelte Artikel NICHT zusammen: Steht ein Artikel mehrfach da, wird jedes Vorkommen ein eigener Eintrag.
-- Die Menge muss zum Originaltext passen: „einmal“ oder „1x“ ist menge 1, nicht 2.
+- Die Menge muss zum Originaltext passen: „einmal“ oder „1x“ ist menge 1, nicht 2. Mengenangaben wie „1x“ oder „2 Stück“ gehören in menge/einheit, nicht in die notiz.
 - Häufige Produkte, die leicht verlesen werden: „H-Sahne“ (haltbare Sahne, nicht „Haarsahne“), „H-Milch“, „Idée Kaffee“ (Kaffeemarke, nicht „Edecafé“).
 - Feld "sicherheit": wie sicher du den Artikel erkannt hast – "hoch" (eindeutig), "mittel" (wahrscheinlich richtig) oder "niedrig" (geraten). Sei ehrlich: Ist ein Wort, eine Zahl oder ein Kreuz nicht eindeutig, ist "mittel" oder "niedrig" richtig und erwünscht.
 - Feld "code": nur bei angekreuzten Artikeln einer gedruckten Ankreuzliste (siehe unten), sonst "". Feld "quelle": "ankreuzliste" für angekreuzte gedruckte Artikel, sonst "handschrift".`;
@@ -38,11 +38,18 @@ Gedruckte Ankreuzliste:
 - Manche Fotos zeigen keinen freien Zettel, sondern eine gedruckte Ankreuzliste. Du erkennst sie an „ANKREUZLISTE JJJJ-MM-TT“ oben rechts oder in der Fußzeile (z. B. „ANKREUZLISTE 2026-11-05“). Dann trägst du genau diesen Text in "kennung" ein. Bei einem freien Zettel ist "kennung" leer.
 - Aufbau: Artikel nach Bereichen (Obst & Gemüse, Brot, Kühlregal …) in zwei Spalten. Jeder Artikel hat eine Zeile mit dem Begriff fett links und „Anzahl ____“ rechts. Darunter stehen eine bis drei Varianten nebeneinander, jede mit einem Kästchen, direkt darunter einem fetten Code (z. B. „43B“; nur eine Zahl wie „12“, wenn es nur eine Variante gibt), einem Produktbild, dem Produktnamen und dem Preis. Bei „nur im Markt“ gibt es Kästchen und Code, aber kein Produkt.
 - WICHTIG: Gedruckte Produkte sind KEINE Einkaufswünsche. Übernimm nur Varianten, deren Kästchen angekreuzt ist (Kreuz, Haken, ausgemalt oder eingekreist). Leere Kästchen ignorierst du, auch wenn das Produkt dasteht. Prüfe jedes Kästchen einzeln.
-- Für einen angekreuzten Artikel: name = der gedruckte Begriff (z. B. „Birnen“), code = der Code unter dem angekreuzten Kästchen (z. B. „3A“), original = der gedruckte Produktname dieser Variante (bei „nur im Markt“: „nur im Markt“), einheit = "", quelle = "ankreuzliste".
-- menge = die handgeschriebene Zahl hinter „Anzahl ____“ in der Zeile des Begriffs. Ist dort nichts eingetragen, ist menge 1.
+- WIDERRUFEN = WEGLASSEN: Wurde ein Kreuz nachträglich durchgestrichen, ist es keine Bestellung. Typisches Bild: ein Kreuz im Kästchen und zusätzlich ein langer Strich, der über das Kästchen und den Code hinausgeht; oder die Zahl bei „Anzahl“ ist durchgestrichen; oder die ganze Zeile ist durchgestrichen. Solche Artikel lässt du komplett weg (auch nicht als „Anzahl ohne Kreuz“). Eine durchgestrichene Anzahl gilt als nicht eingetragen.
+- Für einen angekreuzten Artikel füllst du die Felder so:
+  - name = der fett gedruckte Begriff (z. B. „Bananen“)
+  - code = der fett gedruckte Code direkt unter dem angekreuzten Kästchen (z. B. „2B“), genau wie gedruckt
+  - original = der gedruckte Produktname der angekreuzten Variante, Wort für Wort abgeschrieben, ohne Preis (z. B. „Chiquita Banane ca. 200g“); bei „nur im Markt“: „nur im Markt“. NICHT „X“, „Anzahl …“ oder eine Beschreibung des Kreuzes.
+  - notiz = nur Handgeschriebenes zu diesem Artikel (z. B. „die große“, „nicht Bio“), sonst leer. Der gedruckte Produktname gehört NICHT in die Notiz.
+  - einheit = "", quelle = "ankreuzliste"
+  - Beispiel: Bei „Bananen“ ist 2B angekreuzt, bei Anzahl steht „5“ → name "Bananen", code "2B", original "Chiquita Banane ca. 200g", notiz "", menge 5.
+- menge = die handgeschriebene Zahl hinter „Anzahl ____“ in der Zeile des Begriffs. Ist dort nichts (oder nur Durchgestrichenes) eingetragen, ist menge 1.
 - Sind mehrere Varianten eines Begriffs angekreuzt, wird jede ein eigener Eintrag. Hat jede Variante eine eigene Zahl daneben, gilt diese. Steht nur eine Anzahl beim Begriff, bekommen alle angekreuzten Varianten diese Anzahl, sicherheit höchstens "mittel" und notiz „Anzahl gilt für mehrere Varianten“.
-- Steht eine Anzahl beim Begriff, aber kein Kästchen ist angekreuzt: trotzdem übernehmen (bei mehreren Varianten Variante A), sicherheit "niedrig", notiz „Anzahl ohne Kreuz“.
-- Durchgestrichenes Kreuz oder durchgestrichene Zeile: weglassen.
+- Steht eine (nicht durchgestrichene) Anzahl beim Begriff, aber kein Kästchen ist angekreuzt: trotzdem übernehmen (bei mehreren Varianten Variante A), sicherheit "niedrig", notiz „Anzahl ohne Kreuz“.
+- Bist du nicht sicher, ob ein Kästchen angekreuzt oder ein Kreuz durchgestrichen ist, übernimm den Artikel mit sicherheit "niedrig".
 - Handschriftliche Bemerkungen an gedruckten Artikeln (z. B. „die große“, „nicht Bio“) kommen in "notiz" (bei mehreren Notizen mit Komma getrennt).
 - Die freien Zeilen unter „Nicht auf der Liste? Hier aufschreiben:“ und alles sonst Handgeschriebene (z. B. am Rand) liest du wie einen freien Zettel: code "", quelle "handschrift", Anzahl aus „Anzahl ____“ der Zeile als menge.
 - Ist die Liste nicht vollständig auf dem Foto (z. B. nur eine Seite), lies nur, was zu sehen ist.`;
@@ -158,12 +165,20 @@ export function werteAntwortAus(daten) {
       const text = (wert) => (typeof wert === 'string' ? wert.trim() : '');
       const code = text(e.code).toUpperCase().replace(/\s+/g, '');
       const quelle = code || e.quelle === 'ankreuzliste' ? 'ankreuzliste' : 'handschrift';
+      let notiz = text(e.notiz);
+      let original = text(e.original);
+      // Steht bei einem Ankreuz-Artikel statt des Produktnamens nur „X“ oder „Anzahl …“ im Original,
+      // hat die KI die Felder vertauscht: dann ist der Produktname in der Notiz gelandet.
+      if (quelle === 'ankreuzliste' && notiz && /^(x|☒|\[x\]|angekreuzt|kreuz|anzahl\b)/i.test(original)) {
+        original = notiz;
+        notiz = '';
+      }
       return {
         name,
         menge,
         einheit: quelle === 'ankreuzliste' ? '' : text(e.einheit),
-        notiz: text(e.notiz),
-        original: text(e.original) || name,
+        notiz,
+        original: original || name,
         code: quelle === 'ankreuzliste' ? code : '',
         quelle,
         kategorie,

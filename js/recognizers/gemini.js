@@ -62,17 +62,18 @@ function geminiFehler(status, nachricht) {
 }
 
 export function erkenne(bild, einstellungen, signal, kontext = {}) {
+  // Fotos (vor allem Ankreuzlisten mit vielen Kästchen) brauchen etwas mehr Sorgfalt als Diktate.
   return frage(einstellungen, anweisungMit(kontext.bekannteArtikel), [
     { inline_data: { mime_type: bild.mediaType, data: bild.base64 } },
     { text: 'Lies diesen Einkaufszettel (freier Zettel oder Ankreuzliste).' },
-  ], signal);
+  ], signal, { gruendlich: true });
 }
 
 export function erkenneText(text, einstellungen, signal, kontext = {}) {
   return frage(einstellungen, anweisungMit(kontext.bekannteArtikel, 'text'), [{ text: textNachricht(text) }], signal);
 }
 
-async function frage(einstellungen, anweisung, teile, signal) {
+async function frage(einstellungen, anweisung, teile, signal, { gruendlich = false } = {}) {
   const schluessel = pruefeSchluessel(einstellungen);
   const anfrage = {
     systemInstruction: { parts: [{ text: anweisung }] },
@@ -83,7 +84,8 @@ async function frage(einstellungen, anweisung, teile, signal) {
     },
   };
   // Kurz nachdenken reicht zum Ablesen und ist um ein Vielfaches schneller als der Standard.
-  const denken = anbieterInfo('google').modelle.find((m) => m.id === einstellungen.modell)?.denken;
+  let denken = anbieterInfo('google').modelle.find((m) => m.id === einstellungen.modell)?.denken;
+  if (gruendlich && denken === 'low') denken = 'medium';
   if (denken) anfrage.generationConfig.thinkingConfig = { thinkingLevel: denken };
 
   const antwort = await sicherFetch(`${API}/models/${encodeURIComponent(einstellungen.modell)}:generateContent`, {
