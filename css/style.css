@@ -456,6 +456,17 @@ main {
 .eintrag-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
 .eintrag-name { overflow-wrap: break-word; hyphens: auto; font-weight: 500; }
 .eintrag-notiz { color: var(--text-leise); font-size: 0.82rem; line-height: 1.3; overflow-wrap: break-word; }
+.code-marke {
+  display: inline-block;
+  padding: 0 6px;
+  margin-right: 2px;
+  border-radius: 6px;
+  background: var(--primaer-hell);
+  color: var(--primaer);
+  font-weight: 700;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
 
 .eintrag-menge {
   flex-shrink: 0;

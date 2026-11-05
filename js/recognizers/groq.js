@@ -75,7 +75,7 @@ export function erkenne(bild, einstellungen, signal, kontext = {}) {
     {
       role: 'user',
       content: [
-        { type: 'text', text: 'Lies diesen Einkaufszettel.' },
+        { type: 'text', text: 'Lies diesen Einkaufszettel (freier Zettel oder Ankreuzliste).' },
         { type: 'image_url', image_url: { url: `data:${bild.mediaType};base64,${bild.base64}` } },
       ],
     },

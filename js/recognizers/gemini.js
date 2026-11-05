@@ -3,7 +3,7 @@
 // Der API-Schlüssel kommt aus den Einstellungen und wird nur an generativelanguage.googleapis.com gesendet.
 
 import {
-  anweisungMit, textNachricht, SICHERHEITEN, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
+  anweisungMit, textNachricht, SICHERHEITEN, QUELLEN, ErkennungsFehler, werteAntwortAus, fehlerAusAntwort, sicherFetch, fehlerNachricht,
 } from './gemeinsam.js';
 import { KATEGORIEN } from '../kategorien.js';
 import { anbieterInfo } from '../einstellungen.js';
@@ -24,17 +24,20 @@ const GEMINI_SCHEMA = {
           einheit: { type: 'STRING' },
           notiz: { type: 'STRING' },
           original: { type: 'STRING' },
+          code: { type: 'STRING' },
+          quelle: { type: 'STRING', enum: QUELLEN },
           kategorie: { type: 'STRING', enum: KATEGORIEN.map((k) => k.id) },
           sicherheit: { type: 'STRING', enum: SICHERHEITEN },
         },
-        required: ['name', 'menge', 'einheit', 'notiz', 'original', 'kategorie', 'sicherheit'],
-        propertyOrdering: ['original', 'name', 'menge', 'einheit', 'notiz', 'kategorie', 'sicherheit'],
+        required: ['name', 'menge', 'einheit', 'notiz', 'original', 'code', 'quelle', 'kategorie', 'sicherheit'],
+        propertyOrdering: ['quelle', 'code', 'original', 'name', 'menge', 'einheit', 'notiz', 'kategorie', 'sicherheit'],
       },
     },
     hinweis: { type: 'STRING' },
+    kennung: { type: 'STRING' },
   },
-  required: ['eintraege', 'hinweis'],
-  propertyOrdering: ['eintraege', 'hinweis'],
+  required: ['kennung', 'eintraege', 'hinweis'],
+  propertyOrdering: ['kennung', 'eintraege', 'hinweis'],
 };
 
 function pruefeSchluessel(einstellungen) {
@@ -61,7 +64,7 @@ function geminiFehler(status, nachricht) {
 export function erkenne(bild, einstellungen, signal, kontext = {}) {
   return frage(einstellungen, anweisungMit(kontext.bekannteArtikel), [
     { inline_data: { mime_type: bild.mediaType, data: bild.base64 } },
-    { text: 'Lies diesen Einkaufszettel.' },
+    { text: 'Lies diesen Einkaufszettel (freier Zettel oder Ankreuzliste).' },
   ], signal);
 }
 

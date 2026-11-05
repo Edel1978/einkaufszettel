@@ -82,7 +82,7 @@ async function starteVorgang(datei) {
   zeigeSeite();
 
   try {
-    v.bild = await bereiteBildVor(datei);
+    v.bild = { ...(await bereiteBildVor(datei)), name: datei.name ?? '' };
   } catch (fehler) {
     v.status = 'fehler';
     v.fehler = { code: 'bild', text: `Das Bild konnte nicht gelesen werden. ${fehler.message}` };
@@ -232,21 +232,30 @@ async function erkenneJetzt() {
       : await erkenne(v.bild, v.abbruch.signal, kontext);
     if (vorgang !== v) return;
     const listen = app.listen();
-    const ziel = listen.some((l) => l.id === v.zielListeId) ? v.zielListeId : 'neu';
+    // Weitere Seite einer Ankreuzliste: automatisch in die Liste mit derselben Kennung.
+    const passend = ergebnis.kennung
+      ? [...listen].sort((a, b) => b.erstelltAm.localeCompare(a.erstelltAm)).find((l) => l.kennung === ergebnis.kennung)
+      : null;
+    const ziel = listen.some((l) => l.id === v.zielListeId) ? v.zielListeId : passend?.id ?? 'neu';
     Object.assign(v, {
       status: 'pruefen',
+      kennung: ergebnis.kennung ?? '',
       hinweis: ergebnis.hinweis,
       dienst: ergebnis.dienst,
       ausweichGrund: ergebnis.ausweichGrund,
       ziel,
       neuerName: eindeutigerName(datumsName(), listen),
-      eintraege: ergebnis.eintraege.map((e) => ({
-        ...e,
-        mengeText: formatZahl(e.menge),
-        erkannteKategorie: e.kategorie,
-        uebernehmen: true,
-        zusammenfuehren: true,
-      })),
+      eintraege: ergebnis.eintraege.map((e) => {
+        // Gleicher Code schon in der Liste: vermutlich dieselbe Seite noch einmal fotografiert → erst mal weglassen.
+        const schonDa = Boolean(e.code) && Boolean(listen.find((l) => l.id === ziel)?.eintraege.some((x) => x.code === e.code));
+        return {
+          ...e,
+          mengeText: formatZahl(e.menge),
+          erkannteKategorie: e.kategorie,
+          uebernehmen: !schonDa,
+          zusammenfuehren: !e.code, // Ankreuz-Artikel nie addieren, sondern als eigene Zeile
+        };
+      }),
     });
   } catch (fehler) {
     if (vorgang !== v) return;
@@ -356,7 +365,9 @@ function pruefHtml(v) {
         <p class="leer-titel">${v.eintraege.length} Artikel erkannt</p>
         <p class="leise-text">Bitte prüfen und bei Bedarf korrigieren. Tippe aufs Foto zum Vergrößern.</p>
       </div>
-    </div>`;
+    </div>
+    ${v.kennung ? `<p class="info-box">Ankreuzliste erkannt (${esc(v.kennung.replace('ANKREUZLISTE ', ''))}): nur angekreuzte und handgeschriebene Artikel.
+      Weitere Seiten einfach danach fotografieren – sie kommen in dieselbe Liste.</p>` : ''}`;
   return `
     ${kopf}
     ${v.ausweichGrund
@@ -408,7 +419,9 @@ function pruefEintragHtml(v, e, i) {
         </select>
       </div>
       <input type="text" class="pruef-notiz" data-feld="notiz" value="${esc(e.notiz ?? '')}" aria-label="Notiz" placeholder="Notiz (Marke, Sorte, bio …)">
-      ${e.original ? `<p class="pruef-original">${v.art === 'sprache' ? 'Gehört' : 'Gelesen'}: „${esc(e.original)}“</p>` : ''}
+      ${e.code
+        ? `<p class="pruef-original"><span class="code-marke">${esc(e.code)}</span> Angekreuzt: ${esc(e.original)}</p>`
+        : e.original ? `<p class="pruef-original">${v.art === 'sprache' ? 'Gehört' : 'Gelesen'}: „${esc(e.original)}“</p>` : ''}
       <div class="pruef-hinweise">${hinweiseHtml(v, e)}</div>
     </li>`;
 }
@@ -421,8 +434,10 @@ function hinweiseHtml(v, e) {
     teile.push('<p class="pruef-hinweis">Wahrscheinlich richtig – kurz prüfen</p>');
   }
   const liste = zielListe(v);
-  const vorhanden = liste && e.name.trim() ? findeDoppelt(liste, e.name) : null;
-  if (vorhanden) {
+  const vorhanden = liste && e.name.trim() ? findeDoppelt(liste, e.name, e.code) : null;
+  if (vorhanden && e.code) {
+    teile.push(`<p class="pruef-hinweis">Code ${esc(e.code)} ist schon auf der Liste – Seite doppelt fotografiert? Zum Übernehmen links anhaken.</p>`);
+  } else if (vorhanden) {
     const vorherText = [formatZahl(vorhanden.menge), vorhanden.einheit].filter(Boolean).join(' ');
     const neu = zusammengefuehrt(vorhanden, { menge: leseZahl(e.mengeText), einheit: e.einheit });
     const nachherText = [formatZahl(neu.menge), neu.einheit].filter(Boolean).join(' ');
@@ -516,7 +531,7 @@ async function beiKlick(ev) {
     }
     case 'ergaenzen':
       v.eintraege.push({
-        name: '', menge: null, mengeText: '', einheit: '', notiz: '', original: '', sicherheit: 'hoch',
+        name: '', menge: null, mengeText: '', einheit: '', notiz: '', original: '', code: '', quelle: 'handschrift', sicherheit: 'hoch',
         kategorie: STANDARD_KATEGORIE, erkannteKategorie: STANDARD_KATEGORIE, unsicher: false,
         uebernehmen: true, zusammenfuehren: true,
       });
@@ -538,6 +553,8 @@ async function uebernehmen(v) {
       einheit: e.einheit.trim(),
       notiz: (e.notiz ?? '').trim(),
       original: e.original ?? '',
+      code: e.code ?? '',
+      quelle: e.quelle ?? 'handschrift',
       sicherheit: e.sicherheit ?? 'hoch',
       kategorie: e.kategorie,
       zusammenfuehren: e.zusammenfuehren,
@@ -558,6 +575,9 @@ async function uebernehmen(v) {
     app.fuegeListeHinzu(liste);
   }
   uebernehmeEintraege(liste, auswahl);
+  // Für das Info-Blatt im Excel-Export: wie viele Fotos, und ob es eine Ankreuzliste ist.
+  if (v.art === 'foto') liste.fotos = (liste.fotos ?? 0) + 1;
+  if (v.kennung) liste.kennung = v.kennung;
   await app.sichere(liste);
 
   vorgang = null;

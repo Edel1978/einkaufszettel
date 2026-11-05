@@ -16,6 +16,18 @@ const BEISPIEL = {
   hinweis: '',
 };
 
+const BEISPIEL_ANKREUZLISTE = {
+  kennung: 'ANKREUZLISTE 2026-11-05',
+  eintraege: [
+    { name: 'Birnen', menge: 2, einheit: '', notiz: '', original: 'Grüne Tafelbirne Xenia ca. 200g', code: '3A', quelle: 'ankreuzliste', kategorie: 'obst-gemuese', sicherheit: 'hoch' },
+    { name: 'Bananen', menge: 3, einheit: '', notiz: 'Anzahl gilt für mehrere Varianten', original: 'Chiquita Banane ca. 200g', code: '2B', quelle: 'ankreuzliste', kategorie: 'obst-gemuese', sicherheit: 'mittel' },
+    { name: 'Bananen', menge: 3, einheit: '', notiz: 'Anzahl gilt für mehrere Varianten', original: 'Bio Banane ca. 200g', code: '2C', quelle: 'ankreuzliste', kategorie: 'obst-gemuese', sicherheit: 'mittel' },
+    { name: 'Avocado', menge: 1, einheit: '', notiz: 'Anzahl ohne Kreuz', original: 'Avocado Hass vorgereift 1 Stück', code: '1A', quelle: 'ankreuzliste', kategorie: 'obst-gemuese', sicherheit: 'niedrig' },
+    { name: 'Hackfleisch', menge: 500, einheit: 'g', notiz: '', original: 'Hackfleisch 500g', code: '', quelle: 'handschrift', kategorie: 'fleisch-wurst', sicherheit: 'hoch' },
+  ],
+  hinweis: '',
+};
+
 function warte(ms, signal) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
@@ -26,9 +38,9 @@ function warte(ms, signal) {
   });
 }
 
-export async function erkenne(_bild, _einstellungen, signal) {
+export async function erkenne(bild, _einstellungen, signal) {
   await warte(1500, signal);
-  return werteAntwortAus(structuredClone(BEISPIEL));
+  return werteAntwortAus(structuredClone(/ankreuz/i.test(bild?.name ?? '') ? BEISPIEL_ANKREUZLISTE : BEISPIEL));
 }
 
 // ---------- Diktat ohne KI zerlegen ----------

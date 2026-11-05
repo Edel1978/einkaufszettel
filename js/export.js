@@ -12,8 +12,8 @@ import { erzeugeXlsx } from './xlsx.js';
 import { formatZahl } from './util.js';
 import { ladeEinstellungen } from './einstellungen.js';
 
-export const SPALTEN = ['Artikel', 'Menge', 'Einheit', 'Notiz', 'Original', 'Sicherheit'];
-const BREITEN = [24, 9, 10, 26, 32, 11];
+export const SPALTEN = ['Artikel', 'Menge', 'Einheit', 'Notiz', 'Original', 'Sicherheit', 'Code', 'Quelle'];
+const BREITEN = [24, 9, 10, 26, 34, 11, 8, 13];
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 // Schreibweise der Einheiten im Export (die App selbst bleibt bei ihren Kürzeln).
@@ -34,12 +34,29 @@ export function exportZeilen(liste) {
       // Von Hand eingetragene (oder ältere) Artikel haben keine Originalzeile: dann aus den Angaben bilden.
       const original = e.original?.trim()
         || [formatZahl(e.menge), e.einheit, e.name, e.notiz].filter(Boolean).join(' ');
-      return [e.name, e.menge ?? 1, einheit, e.notiz ?? '', original, e.sicherheit ?? 'hoch'];
+      const quelle = e.code ? 'ankreuzliste' : 'handschrift';
+      return [e.name, e.menge ?? 1, einheit, e.notiz ?? '', original, e.sicherheit ?? 'hoch', e.code ?? '', quelle];
     });
 }
 
+/** Zweites Blatt „Info“: gelesene Kennung und Anzahl der eingelesenen Fotos. */
+export function infoZeilen(liste, zeitpunkt = new Date()) {
+  return [
+    ['Feld', 'Wert'],
+    ['Kennung', liste.kennung ?? ''],
+    ['Fotos', liste.fotos ?? ''],
+    ['Liste', liste.name ?? ''],
+    ['Exportiert', `${dateiName(zeitpunkt).slice(14, 24)} ${String(zeitpunkt.getHours()).padStart(2, '0')}:${String(zeitpunkt.getMinutes()).padStart(2, '0')}`],
+  ];
+}
+
 export function erzeugeExportDatei(liste) {
-  return erzeugeXlsx({ blattName: 'Einkaufsliste', zeilen: [SPALTEN, ...exportZeilen(liste)], breiten: BREITEN });
+  return erzeugeXlsx({
+    blaetter: [
+      { name: 'Einkaufsliste', zeilen: [SPALTEN, ...exportZeilen(liste)], breiten: BREITEN },
+      { name: 'Info', zeilen: infoZeilen(liste), breiten: [12, 30] },
+    ],
+  });
 }
 
 /** Einkaufsliste_2026-11-05.xlsx, ab der zweiten am selben Tag Einkaufsliste_2026-11-05_2.xlsx usw. */

@@ -2,8 +2,10 @@
 // Prüfung der Antwort und verständliche Fehlermeldungen.
 //
 // Jeder Dienst liefert dasselbe Ergebnis:
-//   { eintraege: [{ name, menge, einheit, notiz, original, kategorie, sicherheit, unsicher }], hinweis }
+//   { kennung, eintraege: [{ name, menge, einheit, notiz, original, code, quelle, kategorie, sicherheit, unsicher }], hinweis }
 // sicherheit: 'hoch' | 'mittel' | 'niedrig'; unsicher = sicherheit ist nicht 'hoch' (für die Anzeige).
+// kennung: z. B. "ANKREUZLISTE 2026-11-05", wenn das Foto eine gedruckte Ankreuzliste zeigt, sonst "".
+// quelle: 'ankreuzliste' (angekreuzter gedruckter Artikel, mit code) oder 'handschrift'.
 
 import { KATEGORIEN, STANDARD_KATEGORIE, EINHEITEN, rateKategorie, gelernteKategorie } from '../kategorien.js';
 
@@ -25,7 +27,25 @@ const REGELN_ARTIKEL = `- Feld "name": nur der Artikel selbst, so wie man ihn au
 - Ordne jeden Artikel einer Kategorie zu (Feld "kategorie", nur die ID):
 ${KATEGORIEN.map((k) => `  - ${k.id}: ${k.name} (z. B. ${k.beispiele})`).join('\n')}
 - Fasse doppelte Artikel NICHT zusammen: Steht ein Artikel mehrfach da, wird jedes Vorkommen ein eigener Eintrag.
-- Feld "sicherheit": wie sicher du den Artikel erkannt hast – "hoch" (eindeutig), "mittel" (wahrscheinlich richtig) oder "niedrig" (geraten).`;
+- Die Menge muss zum Originaltext passen: „einmal“ oder „1x“ ist menge 1, nicht 2.
+- Häufige Produkte, die leicht verlesen werden: „H-Sahne“ (haltbare Sahne, nicht „Haarsahne“), „H-Milch“, „Idée Kaffee“ (Kaffeemarke, nicht „Edecafé“).
+- Feld "sicherheit": wie sicher du den Artikel erkannt hast – "hoch" (eindeutig), "mittel" (wahrscheinlich richtig) oder "niedrig" (geraten). Sei ehrlich: Ist ein Wort, eine Zahl oder ein Kreuz nicht eindeutig, ist "mittel" oder "niedrig" richtig und erwünscht.
+- Feld "code": nur bei angekreuzten Artikeln einer gedruckten Ankreuzliste (siehe unten), sonst "". Feld "quelle": "ankreuzliste" für angekreuzte gedruckte Artikel, sonst "handschrift".`;
+
+// Zusatzregeln für die gedruckte Ankreuzliste aus „REWE Einkauf“.
+const REGELN_ANKREUZLISTE = `
+Gedruckte Ankreuzliste:
+- Manche Fotos zeigen keinen freien Zettel, sondern eine gedruckte Ankreuzliste. Du erkennst sie an „ANKREUZLISTE JJJJ-MM-TT“ oben rechts oder in der Fußzeile (z. B. „ANKREUZLISTE 2026-11-05“). Dann trägst du genau diesen Text in "kennung" ein. Bei einem freien Zettel ist "kennung" leer.
+- Aufbau: Artikel nach Bereichen (Obst & Gemüse, Brot, Kühlregal …) in zwei Spalten. Jeder Artikel hat eine Zeile mit dem Begriff fett links und „Anzahl ____“ rechts. Darunter stehen eine bis drei Varianten nebeneinander, jede mit einem Kästchen, direkt darunter einem fetten Code (z. B. „43B“; nur eine Zahl wie „12“, wenn es nur eine Variante gibt), einem Produktbild, dem Produktnamen und dem Preis. Bei „nur im Markt“ gibt es Kästchen und Code, aber kein Produkt.
+- WICHTIG: Gedruckte Produkte sind KEINE Einkaufswünsche. Übernimm nur Varianten, deren Kästchen angekreuzt ist (Kreuz, Haken, ausgemalt oder eingekreist). Leere Kästchen ignorierst du, auch wenn das Produkt dasteht. Prüfe jedes Kästchen einzeln.
+- Für einen angekreuzten Artikel: name = der gedruckte Begriff (z. B. „Birnen“), code = der Code unter dem angekreuzten Kästchen (z. B. „3A“), original = der gedruckte Produktname dieser Variante (bei „nur im Markt“: „nur im Markt“), einheit = "", quelle = "ankreuzliste".
+- menge = die handgeschriebene Zahl hinter „Anzahl ____“ in der Zeile des Begriffs. Ist dort nichts eingetragen, ist menge 1.
+- Sind mehrere Varianten eines Begriffs angekreuzt, wird jede ein eigener Eintrag. Hat jede Variante eine eigene Zahl daneben, gilt diese. Steht nur eine Anzahl beim Begriff, bekommen alle angekreuzten Varianten diese Anzahl, sicherheit höchstens "mittel" und notiz „Anzahl gilt für mehrere Varianten“.
+- Steht eine Anzahl beim Begriff, aber kein Kästchen ist angekreuzt: trotzdem übernehmen (bei mehreren Varianten Variante A), sicherheit "niedrig", notiz „Anzahl ohne Kreuz“.
+- Durchgestrichenes Kreuz oder durchgestrichene Zeile: weglassen.
+- Handschriftliche Bemerkungen an gedruckten Artikeln (z. B. „die große“, „nicht Bio“) kommen in "notiz" (bei mehreren Notizen mit Komma getrennt).
+- Die freien Zeilen unter „Nicht auf der Liste? Hier aufschreiben:“ und alles sonst Handgeschriebene (z. B. am Rand) liest du wie einen freien Zettel: code "", quelle "handschrift", Anzahl aus „Anzahl ____“ der Zeile als menge.
+- Ist die Liste nicht vollständig auf dem Foto (z. B. nur eine Seite), lies nur, was zu sehen ist.`;
 
 export const ANWEISUNG = `Du liest Fotos von handgeschriebenen Einkaufszetteln (meist auf Deutsch) und wandelst sie in eine saubere Einkaufsliste um.
 
@@ -39,7 +59,8 @@ Regeln:
 - Ist eine Zahl überschrieben oder korrigiert, gilt die zuletzt geschriebene Zahl; sicherheit dann höchstens "mittel".
 ${REGELN_ARTIKEL}
 - Unleserliches nicht weglassen: Ist ein Wort schwer lesbar, gib deine beste Vermutung an und setze sicherheit auf "niedrig".
-- Ist auf dem Foto kein Einkaufszettel oder nichts lesbar, gib eine leere Liste zurück und erkläre kurz in "hinweis", woran es liegt (z. B. „Bild zu unscharf“). Sonst ist "hinweis" leer.`;
+- Ist auf dem Foto kein Einkaufszettel oder nichts lesbar, gib eine leere Liste zurück und erkläre kurz in "hinweis", woran es liegt (z. B. „Bild zu unscharf“). Ist auf einer Ankreuzliste nichts angekreuzt und nichts von Hand geschrieben, ebenfalls leere Liste mit kurzem Hinweis. Sonst ist "hinweis" leer.
+${REGELN_ANKREUZLISTE}`;
 
 export const ANWEISUNG_TEXT = `Du bekommst einen gesprochenen Text, den eine Spracherkennung aufgeschrieben hat (meist auf Deutsch). Der Nutzer hat darin diktiert, was er einkaufen möchte. Wandle das in eine saubere Einkaufsliste um.
 
@@ -51,7 +72,8 @@ Regeln:
 - Spracherkennungen verhören sich manchmal. Ergibt ein Wort beim Einkaufen keinen Sinn, nimm den naheliegenden Artikel, der ähnlich klingt, und setze sicherheit auf "niedrig".
 - Feld "original": der Teil des Textes, der zu diesem Artikel gehört, wörtlich (z. B. „zwei Liter Milch“).
 ${REGELN_ARTIKEL}
-- Enthält der Text keine Artikel, gib eine leere Liste zurück und erkläre kurz in "hinweis", woran es liegt. Sonst ist "hinweis" leer.`;
+- Enthält der Text keine Artikel, gib eine leere Liste zurück und erkläre kurz in "hinweis", woran es liegt. Sonst ist "hinweis" leer.
+- "kennung" ist beim Diktat immer leer, "code" leer und "quelle" immer "handschrift".`;
 
 /**
  * Anweisung plus die Artikel, die der Nutzer schon auf seinen Listen hatte.
@@ -73,10 +95,12 @@ export function textNachricht(text) {
 }
 
 export const SICHERHEITEN = ['hoch', 'mittel', 'niedrig'];
+export const QUELLEN = ['handschrift', 'ankreuzliste'];
 
 export const ANTWORT_SCHEMA = {
   type: 'object',
   properties: {
+    kennung: { type: 'string' },
     eintraege: {
       type: 'array',
       items: {
@@ -87,18 +111,26 @@ export const ANTWORT_SCHEMA = {
           einheit: { type: 'string' },
           notiz: { type: 'string' },
           original: { type: 'string' },
+          code: { type: 'string' },
+          quelle: { type: 'string', enum: QUELLEN },
           kategorie: { type: 'string', enum: KATEGORIEN.map((k) => k.id) },
           sicherheit: { type: 'string', enum: SICHERHEITEN },
         },
-        required: ['name', 'menge', 'einheit', 'notiz', 'original', 'kategorie', 'sicherheit'],
+        required: ['name', 'menge', 'einheit', 'notiz', 'original', 'code', 'quelle', 'kategorie', 'sicherheit'],
         additionalProperties: false,
       },
     },
     hinweis: { type: 'string' },
   },
-  required: ['eintraege', 'hinweis'],
+  required: ['kennung', 'eintraege', 'hinweis'],
   additionalProperties: false,
 };
+
+/** "ANKREUZLISTE 2026-11-05" in einheitlicher Schreibweise, sonst "". */
+export function normaleKennung(text) {
+  const treffer = String(text ?? '').match(/ankreuzliste\s*[:\-]?\s*(\d{4})\s*-\s*(\d{2})\s*-\s*(\d{2})/i);
+  return treffer ? `ANKREUZLISTE ${treffer[1]}-${treffer[2]}-${treffer[3]}` : '';
+}
 
 /** Fehler mit Code (für die Programmlogik) und verständlichem Text (für die Anzeige). */
 export class ErkennungsFehler extends Error {
@@ -124,12 +156,16 @@ export function werteAntwortAus(daten) {
       // Ältere Antworten kennen nur "unsicher" (ja/nein).
       const sicherheit = SICHERHEITEN.includes(e.sicherheit) ? e.sicherheit : (e.unsicher === true ? 'niedrig' : 'hoch');
       const text = (wert) => (typeof wert === 'string' ? wert.trim() : '');
+      const code = text(e.code).toUpperCase().replace(/\s+/g, '');
+      const quelle = code || e.quelle === 'ankreuzliste' ? 'ankreuzliste' : 'handschrift';
       return {
         name,
         menge,
-        einheit: text(e.einheit),
+        einheit: quelle === 'ankreuzliste' ? '' : text(e.einheit),
         notiz: text(e.notiz),
         original: text(e.original) || name,
+        code: quelle === 'ankreuzliste' ? code : '',
+        quelle,
         kategorie,
         sicherheit,
         unsicher: sicherheit !== 'hoch',
@@ -137,12 +173,13 @@ export function werteAntwortAus(daten) {
     });
 
   const hinweis = typeof daten?.hinweis === 'string' ? daten.hinweis.trim() : '';
+  const kennung = normaleKennung(daten?.kennung);
   if (eintraege.length === 0) {
     throw new ErkennungsFehler('nichts-erkannt', hinweis
       ? `Es wurden keine Artikel erkannt: ${hinweis}`
       : 'Auf dem Foto wurden keine Artikel erkannt. Versuche es mit einem schärferen, gut beleuchteten Foto.');
   }
-  return { eintraege, hinweis };
+  return { kennung, eintraege, hinweis };
 }
 
 /** Übersetzt HTTP-Fehler in verständliche Meldungen. */

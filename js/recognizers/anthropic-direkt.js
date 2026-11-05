@@ -41,7 +41,7 @@ async function sendeAnfrage(schluessel, anfrage, mitAusweichModell, signal) {
 export function erkenne(bild, einstellungen, signal, kontext = {}) {
   return frage(einstellungen, anweisungMit(kontext.bekannteArtikel), [
     { type: 'image', source: { type: 'base64', media_type: bild.mediaType, data: bild.base64 } },
-    { type: 'text', text: 'Lies diesen Einkaufszettel.' },
+    { type: 'text', text: 'Lies diesen Einkaufszettel (freier Zettel oder Ankreuzliste).' },
   ], signal);
 }
 

@@ -121,20 +121,26 @@ function zelle(wert, zeile, index, fett) {
 
 const NS = 'http://schemas.openxmlformats.org';
 
-/**
- * Erzeugt eine .xlsx mit einem Tabellenblatt.
- * zeilen: Array von Zeilen, jede ein Array aus Text, Zahl oder leer. Zeile 0 = Kopfzeile (fett).
- * breiten: optionale Spaltenbreiten in Zeichen.
- */
-export function erzeugeXlsx({ blattName, zeilen, breiten = [] }) {
-  const blatt = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+function blattXml({ zeilen, breiten = [] }) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="${NS}/spreadsheetml/2006/main">${breiten.length ? `<cols>${breiten.map((b, i) => `<col min="${i + 1}" max="${i + 1}" width="${b}" customWidth="1"/>`).join('')}</cols>` : ''}<sheetData>${zeilen.map((z, i) => `<row r="${i + 1}">${z.map((wert, s) => zelle(wert, i + 1, s, i === 0)).join('')}</row>`).join('')}</sheetData></worksheet>`;
+}
+
+/**
+ * Erzeugt eine .xlsx mit einem oder mehreren Tabellenblättern.
+ * blaetter: [{ name, zeilen, breiten }] – zeilen: Array von Zeilen, jede ein Array aus Text, Zahl oder leer;
+ * Zeile 0 = Kopfzeile (fett). breiten: optionale Spaltenbreiten in Zeichen.
+ * Kurzform für ein Blatt: { blattName, zeilen, breiten }.
+ */
+export function erzeugeXlsx({ blaetter, blattName, zeilen, breiten }) {
+  const liste = blaetter ?? [{ name: blattName, zeilen, breiten }];
+  const nummern = liste.map((_, i) => i + 1);
 
   return zip([
     {
       name: '[Content_Types].xml',
       inhalt: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="${NS}/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
+<Types xmlns="${NS}/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${nummern.map((n) => `<Override PartName="/xl/worksheets/sheet${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
     },
     {
       name: '_rels/.rels',
@@ -144,18 +150,18 @@ export function erzeugeXlsx({ blattName, zeilen, breiten = [] }) {
     {
       name: 'xl/workbook.xml',
       inhalt: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="${NS}/spreadsheetml/2006/main" xmlns:r="${NS}/officeDocument/2006/relationships"><sheets><sheet name="${xml(blattName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+<workbook xmlns="${NS}/spreadsheetml/2006/main" xmlns:r="${NS}/officeDocument/2006/relationships"><sheets>${liste.map((b, i) => `<sheet name="${xml(b.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`,
     },
     {
       name: 'xl/_rels/workbook.xml.rels',
       inhalt: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="${NS}/package/2006/relationships"><Relationship Id="rId1" Type="${NS}/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="${NS}/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+<Relationships xmlns="${NS}/package/2006/relationships">${nummern.map((n) => `<Relationship Id="rId${n}" Type="${NS}/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${n}.xml"/>`).join('')}<Relationship Id="rId${liste.length + 1}" Type="${NS}/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
     },
     {
       name: 'xl/styles.xml',
       inhalt: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="${NS}/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`,
     },
-    { name: 'xl/worksheets/sheet1.xml', inhalt: blatt },
+    ...liste.map((b, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, inhalt: blattXml(b) })),
   ]);
 }

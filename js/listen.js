@@ -1,8 +1,10 @@
 // Datenmodell und Logik für Listen und Einträge (ohne Oberfläche).
 //
-// Liste:   { id, name, erstelltAm, geaendertAm, eintraege[] }
-// Eintrag: { id, name, menge, einheit, notiz, original, sicherheit, kategorie, erledigt, reihenfolge, geaendertAm }
+// Liste:   { id, name, erstelltAm, geaendertAm, eintraege[], fotos?, kennung? }
+//   fotos: Anzahl eingelesener Fotos; kennung: z. B. "ANKREUZLISTE 2026-11-05" bei einer Ankreuzliste
+// Eintrag: { id, name, menge, einheit, notiz, original, code, quelle, sicherheit, kategorie, erledigt, reihenfolge, geaendertAm }
 //   notiz: Marke/Sorte/Zusatz; original: so wie auf dem Zettel gelesen; sicherheit: 'hoch' | 'mittel' | 'niedrig'
+//   code: Code der Ankreuzliste (z. B. "3B"), sonst ""; quelle: 'ankreuzliste' oder 'handschrift'
 
 import { neueId, jetzt } from './util.js';
 import { STANDARD_KATEGORIE, kategorieRang, aktuelleKategorie } from './kategorien.js';
@@ -31,7 +33,8 @@ export function neueListe(name) {
 }
 
 export function neuerEintrag({
-  name, menge = null, einheit = '', notiz = '', original = '', sicherheit = 'hoch', kategorie = STANDARD_KATEGORIE,
+  name, menge = null, einheit = '', notiz = '', original = '', code = '', quelle = 'handschrift', sicherheit = 'hoch',
+  kategorie = STANDARD_KATEGORIE,
 }, reihenfolge = 0) {
   return {
     id: neueId(),
@@ -40,6 +43,8 @@ export function neuerEintrag({
     einheit: einheit.trim(),
     notiz: notiz.trim(),
     original: original.trim(),
+    code: code.trim(),
+    quelle: code.trim() ? 'ankreuzliste' : quelle,
     sicherheit,
     kategorie,
     erledigt: false,
@@ -167,10 +172,15 @@ function normalisiere(text) {
   return String(text ?? '').toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-/** Vorhandener Eintrag mit gleichem Namen oder null. */
-export function findeDoppelt(liste, name) {
+/**
+ * Vorhandener Eintrag mit gleichem Namen oder null.
+ * Artikel der Ankreuzliste gelten nur bei gleichem Code als doppelt (3A und 3B sind verschiedene Produkte);
+ * frei geschriebene Artikel werden nur mit anderen frei geschriebenen verglichen.
+ */
+export function findeDoppelt(liste, name, code = '') {
+  if (code) return liste.eintraege.find((e) => e.code === code) ?? null;
   const gesucht = normalisiere(name);
-  return liste.eintraege.find((e) => normalisiere(e.name) === gesucht) ?? null;
+  return liste.eintraege.find((e) => !e.code && normalisiere(e.name) === gesucht) ?? null;
 }
 
 /**
@@ -197,7 +207,7 @@ export function zusammengefuehrt(vorhanden, neu) {
  */
 export function uebernehmeEintraege(liste, eintraege) {
   for (const neu of eintraege) {
-    const vorhanden = neu.zusammenfuehren ? findeDoppelt(liste, neu.name) : null;
+    const vorhanden = neu.zusammenfuehren ? findeDoppelt(liste, neu.name, neu.code) : null;
     if (vorhanden) {
       aendereEintrag(liste, vorhanden.id, {
         ...zusammengefuehrt(vorhanden, neu),

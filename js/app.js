@@ -419,6 +419,7 @@ function eintragHtml(e) {
         <span class="haken" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
         <span class="eintrag-text">
           <span class="eintrag-name">${esc(e.name)}</span>
+          ${e.code ? `<span class="eintrag-notiz"><span class="code-marke">${esc(e.code)}</span> ${esc(e.original)}</span>` : ''}
           ${e.notiz ? `<span class="eintrag-notiz">${esc(e.notiz)}</span>` : ''}
         </span>
         ${e.erledigt && menge ? `<span class="eintrag-menge">${esc(menge)}</span>` : ''}
