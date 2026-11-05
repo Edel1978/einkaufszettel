@@ -3,7 +3,7 @@
 //   ein Artikel pro Zeile (nur offene Artikel), Dateiname Einkaufsliste_JJJJ-MM-TT(_2).xlsx.
 //
 // Wege, die Datei loszuwerden:
-//   - "pc":            an den Empfänger auf dem PC schicken (pc-empfaenger/, über Tailscale)
+//   - "pc":            an den Empfänger auf NAS oder PC schicken (empfaenger/, über Tailscale)
 //   - "ordner":        am PC (Chrome/Edge) direkt in einen einmal gewählten Ordner speichern
 //   - "teilen":        Teilen-Menü (nicht auf Android: Chrome lässt dort keine Excel-Dateien teilen)
 //   - "herunterladen": normaler Download
@@ -120,7 +120,7 @@ async function freierName(ordner) {
   }
 }
 
-// ---------- Empfänger auf dem PC ----------
+// ---------- Empfänger auf NAS oder PC (Einstellung „pcAdresse“) ----------
 
 function ohneSchraegstrich(adresse) {
   return String(adresse ?? '').trim().replace(/\/+$/, '');
@@ -140,17 +140,18 @@ async function anPc(adresse, pfad, optionen = {}) {
       signal: AbortSignal.timeout(15000),
     });
   } catch {
-    throw new Error('PC nicht erreichbar. Ist der PC an und Tailscale auf beiden Geräten verbunden?');
+    throw new Error('Empfänger nicht erreichbar. Ist Tailscale auf dem Handy verbunden (und NAS bzw. PC an)?');
   }
   const daten = await antwort.json().catch(() => ({}));
-  if (!antwort.ok) throw new Error(daten.fehler || `Der PC antwortet mit Fehler ${antwort.status}`);
+  if (!antwort.ok) throw new Error(daten.fehler || `Der Empfänger antwortet mit Fehler ${antwort.status}`);
   return daten;
 }
 
-/** Prüft die Verbindung zum Empfänger; liefert den Namen des Zielordners. */
+/** Prüft die Verbindung zum Empfänger; liefert { ort, ordner }. */
 export async function testePc(adresse = pcAdresse()) {
   if (!adresse) throw new Error('Keine Adresse eingetragen');
-  return (await anPc(ohneSchraegstrich(adresse), 'status')).ordner;
+  const daten = await anPc(ohneSchraegstrich(adresse), 'status');
+  return { ort: daten.ort || 'PC', ordner: daten.ordner };
 }
 
 // ---------- Export ----------
@@ -158,7 +159,7 @@ export async function testePc(adresse = pcAdresse()) {
 /** Welche Wege auf diesem Gerät gehen. */
 export async function exportWege() {
   const wege = [];
-  if (pcAdresse()) wege.push({ wert: 'pc', text: 'An den PC senden' });
+  if (pcAdresse()) wege.push({ wert: 'pc', text: 'An NAS/PC senden (Tailscale)' });
   if (ordnerMoeglich()) {
     const ordner = await gemerkterOrdner();
     wege.push({ wert: 'ordner', text: ordner ? `In Ordner „${ordner}“ speichern` : 'In einen Ordner speichern …' });
@@ -183,7 +184,7 @@ export async function exportiere(liste, weg) {
         headers: { 'Content-Type': 'application/octet-stream' },
         body: new Blob([bytes], { type: MIME }),
       });
-      return { name: daten.name, wo: `am PC im Ordner „${daten.ordner}“` };
+      return { name: daten.name, wo: `${daten.ort || 'PC'}, Ordner „${daten.ordner}“` };
     }
 
     if (weg === 'ordner' || weg === 'ordner-neu') {

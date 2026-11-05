@@ -1,14 +1,17 @@
 """Empfänger für Excel-Exporte der Einkaufszettel-App.
 
-Läuft auf dem PC und nimmt die Datei entgegen, die die App mit „An PC senden“ schickt,
-und legt sie als Einkaufsliste_JJJJ-MM-TT(_2).xlsx im Zielordner ab.
+Nimmt die Datei entgegen, die die App mit „Senden“ schickt, und legt sie als
+Einkaufsliste_JJJJ-MM-TT(_2).xlsx im Zielordner ab.
 
 Erreichbar ist er nur über Tailscale: Das Programm hört ausschließlich auf 127.0.0.1,
 „tailscale serve“ reicht Anfragen aus dem eigenen Tailnet per HTTPS hierher weiter.
 Angenommen werden nur Anfragen von der App selbst (Herkunft + eigene Kopfzeile).
 
-Aufruf:   pythonw empfaenger.py "C:\\Pfad\\zum\\Zielordner" [port]
-Einmalig: tailscale serve --bg --set-path /einkaufszettel http://127.0.0.1:8765
+Auf dem NAS (Docker): siehe docker-compose.yml und ANLEITUNG_NAS.md.
+Auf dem PC:  pythonw empfaenger.py "C:/Pfad/zum/Zielordner" [port]
+             tailscale serve --bg --set-path /einkaufszettel http://127.0.0.1:8765
+
+Umgebungsvariable EMPFAENGER_ORT (z. B. „NAS“) steht in der Rückmeldung an die App.
 """
 
 import datetime
@@ -27,12 +30,15 @@ KOPFZEILE = 'X-Einkaufszettel'
 ZIEL = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).with_name('Listen'))
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8765
 
-logging.basicConfig(
-    filename=Path(__file__).with_name('empfaenger.log'),
-    level=logging.INFO,
-    format='%(asctime)s %(message)s',
-    encoding='utf-8',
-)
+ORT = os.environ.get('EMPFAENGER_ORT', 'PC')
+
+# Protokoll neben das Programm schreiben; geht das nicht (Container: Programmordner nur lesbar),
+# auf die Konsole – dort zeigt es die Docker-App unter „Protokoll“.
+try:
+    logging.basicConfig(filename=Path(__file__).with_name('empfaenger.log'), level=logging.INFO,
+                        format='%(asctime)s %(message)s', encoding='utf-8')
+except OSError:
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s %(message)s')
 
 
 def herkunft_erlaubt(herkunft):
@@ -103,7 +109,7 @@ class Empfaenger(BaseHTTPRequestHandler):
             return
         if not self.pruefe_anfrage():
             return
-        self.antworte(200, {'ok': True, 'ordner': ZIEL.name})
+        self.antworte(200, {'ok': True, 'ort': ORT, 'ordner': ZIEL.name})
 
     def do_POST(self):
         if self.pfad() != 'liste':
@@ -131,9 +137,9 @@ class Empfaenger(BaseHTTPRequestHandler):
             datei.write(daten)
         os.replace(hilfe, ZIEL / name)
         logging.info('Gespeichert: %s (%d Bytes)', name, len(daten))
-        self.antworte(200, {'ok': True, 'name': name, 'ordner': ZIEL.name})
+        self.antworte(200, {'ok': True, 'ort': ORT, 'name': name, 'ordner': ZIEL.name})
 
 
 if __name__ == '__main__':
-    logging.info('Start: Port %d, Ziel %s', PORT, ZIEL)
+    logging.info('Start (%s): Port %d, Ziel %s', ORT, PORT, ZIEL)
     ThreadingHTTPServer(('127.0.0.1', PORT), Empfaenger).serve_forever()

@@ -17,5 +17,7 @@ Thumbs.db
 UEBERGABE_*.md
 RUECKMELDUNG_*.md
 
-# Protokoll des PC-Empfängers
-pc-empfaenger/*.log
+# Empfänger: Protokoll, Tailscale-Schlüssel und -Zustand
+empfaenger/*.log
+empfaenger/*.env
+empfaenger/tailscale/state/

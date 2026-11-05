@@ -110,11 +110,11 @@ export function zeigeEinstellungen(app) {
       </section>
 
       <section class="block">
-        <h2>Excel-Export an den PC</h2>
-        <label class="feld"><span>Adresse des PC-Empfängers</span>
-          <input name="pcAdresse" type="url" value="${esc(e.pcAdresse)}" placeholder="https://…ts.net/einkaufszettel" spellcheck="false" autocapitalize="off"></label>
-        <p class="leise-text">Dann gibt es beim Export „An den PC senden“. Der PC muss an sein und Tailscale auf beiden Geräten verbunden.</p>
-        <button class="btn btn-breit" type="button" data-pc-testen>PC-Verbindung testen</button>
+        <h2>Excel-Export an NAS oder PC</h2>
+        <label class="feld"><span>Adresse des Empfängers</span>
+          <input name="pcAdresse" type="url" value="${esc(e.pcAdresse)}" placeholder="https://…ts.net" spellcheck="false" autocapitalize="off"></label>
+        <p class="leise-text">Dann gibt es beim Export „An NAS/PC senden“. Tailscale muss auf dem Handy verbunden sein.</p>
+        <button class="btn btn-breit" type="button" data-pc-testen>Verbindung zum Empfänger testen</button>
         <div class="test-ergebnis" data-pc-ergebnis role="status" hidden></div>
       </section>
 
@@ -210,8 +210,8 @@ export function zeigeEinstellungen(app) {
     feld.hidden = false;
     feld.textContent = 'Teste Verbindung …';
     try {
-      const ordner = await testePc();
-      feld.innerHTML = `<p class="ok">✓ Verbunden – Dateien landen im Ordner „${esc(ordner)}“.</p>`;
+      const { ort, ordner } = await testePc();
+      feld.innerHTML = `<p class="ok">✓ Verbunden (${esc(ort)}) – Dateien landen im Ordner „${esc(ordner)}“.</p>`;
     } catch (fehler) {
       feld.innerHTML = `<p class="fehler">✗ ${esc(fehler.message)}</p>`;
     }
